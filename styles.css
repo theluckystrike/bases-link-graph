@@ -1,0 +1,121 @@
+.bases-link-graph {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 360px;
+	overflow: hidden;
+}
+
+.bases-link-graph-bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--size-4-2);
+	padding: var(--size-4-1) var(--size-4-3);
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	border-bottom: var(--border-width) solid var(--background-modifier-border);
+}
+
+.bases-link-graph-count {
+	margin-inline-end: auto;
+}
+
+.bases-link-graph-focus {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-4-1);
+	padding: 0 var(--size-4-2);
+	border-radius: var(--radius-s);
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.bases-link-graph-clear {
+	display: inline-flex;
+	cursor: var(--cursor);
+}
+
+.bases-link-graph-pro-note {
+	color: var(--text-warning);
+}
+
+.bases-link-graph-stage {
+	position: relative;
+	flex: 1 1 0;
+	min-height: 0;
+}
+
+.bases-link-graph-canvas {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	display: block;
+	cursor: grab;
+	touch-action: none;
+}
+
+.bases-link-graph-canvas.is-over-node {
+	cursor: var(--cursor-link);
+}
+
+.bases-link-graph-legend {
+	display: none;
+	position: absolute;
+	left: var(--size-4-3);
+	bottom: var(--size-4-3);
+	max-height: 50%;
+	overflow-y: auto;
+	padding: var(--size-4-2) var(--size-4-3);
+	border-radius: var(--radius-m);
+	background-color: var(--background-secondary);
+	border: var(--border-width) solid var(--background-modifier-border);
+	font-size: var(--font-ui-smaller);
+}
+
+.bases-link-graph-legend.is-shown {
+	display: block;
+}
+
+.bases-link-graph-legend-title {
+	font-weight: var(--font-semibold);
+	margin-bottom: var(--size-4-1);
+}
+
+.bases-link-graph-legend-row {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+}
+
+.bases-link-graph-swatch {
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	flex: none;
+}
+
+.bases-link-graph-tip {
+	display: none;
+	position: absolute;
+	pointer-events: none;
+	max-width: 280px;
+	padding: var(--size-4-1) var(--size-4-2);
+	border-radius: var(--radius-s);
+	background-color: var(--background-secondary);
+	border: var(--border-width) solid var(--background-modifier-border);
+	box-shadow: var(--shadow-s);
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.bases-link-graph-tip.is-shown {
+	display: block;
+}
+
+.bases-link-graph-tip-title {
+	color: var(--text-normal);
+	font-weight: var(--font-semibold);
+}

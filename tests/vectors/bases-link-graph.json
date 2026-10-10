@@ -1,0 +1,1523 @@
+{
+ "slug": "bases-link-graph",
+ "module": "bases-link-graph/src/graph",
+ "function": "buildGraph",
+ "note": "buildGraph cases: args = [rows as [{id, label, links: {path: count}, props: {propertyId: value}}], options {showOrphans, linkEdges, sharedProps, maxGroup, focus, depth}]; expected = nodes as ids in order, edges as [source, target, kind, weight, mutual] for links and [source, target, kind, weight, prop, values] for shared values, and hidden {orphans, outside} when present. Cases with a \"function\" field call that export of the same module (sizeScale, colorScale, parseNumber) with args and compare the whole result.",
+ "cases": [
+  {
+   "name": "one link between two rows",
+   "args": [
+    [
+     {
+      "id": "a.md",
+      "label": "a",
+      "links": {
+       "b.md": 1
+      }
+     },
+     {
+      "id": "b.md",
+      "label": "b",
+      "links": {}
+     }
+    ],
+    {}
+   ],
+   "expected": {
+    "nodes": [
+     "a.md",
+     "b.md"
+    ],
+    "edges": [
+     [
+      0,
+      1,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 0
+    }
+   }
+  },
+  {
+   "name": "links both ways merge into one mutual edge",
+   "args": [
+    [
+     {
+      "id": "a.md",
+      "label": "a",
+      "links": {
+       "b.md": 1
+      }
+     },
+     {
+      "id": "b.md",
+      "label": "b",
+      "links": {
+       "a.md": 2
+      }
+     }
+    ],
+    {}
+   ],
+   "expected": {
+    "nodes": [
+     "a.md",
+     "b.md"
+    ],
+    "edges": [
+     [
+      0,
+      1,
+      "link",
+      3,
+      true
+     ]
+    ]
+   }
+  },
+  {
+   "name": "links to notes outside the base and self links are ignored",
+   "args": [
+    [
+     {
+      "id": "a.md",
+      "label": "a",
+      "links": {
+       "c.md": 4,
+       "a.md": 1
+      }
+     },
+     {
+      "id": "b.md",
+      "label": "b",
+      "links": {}
+     }
+    ],
+    {}
+   ],
+   "expected": {
+    "nodes": [
+     "a.md",
+     "b.md"
+    ],
+    "edges": [],
+    "hidden": {
+     "orphans": 0,
+     "outside": 0
+    }
+   }
+  },
+  {
+   "name": "notes without links are hidden when showOrphans is false",
+   "args": [
+    [
+     {
+      "id": "a.md",
+      "label": "a",
+      "links": {
+       "b.md": 1
+      }
+     },
+     {
+      "id": "b.md",
+      "label": "b",
+      "links": {}
+     },
+     {
+      "id": "c.md",
+      "label": "c",
+      "links": {}
+     }
+    ],
+    {
+     "showOrphans": false
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "a.md",
+     "b.md"
+    ],
+    "edges": [
+     [
+      0,
+      1,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 1,
+     "outside": 0
+    }
+   }
+  },
+  {
+   "name": "a duplicate row id keeps the first row",
+   "args": [
+    [
+     {
+      "id": "a.md",
+      "label": "a",
+      "links": {}
+     },
+     {
+      "id": "a.md",
+      "label": "a",
+      "links": {
+       "b.md": 1
+      }
+     },
+     {
+      "id": "b.md",
+      "label": "b",
+      "links": {}
+     }
+    ],
+    {}
+   ],
+   "expected": {
+    "nodes": [
+     "a.md",
+     "b.md"
+    ],
+    "edges": []
+   }
+  },
+  {
+   "name": "linkEdges false draws no link edges",
+   "args": [
+    [
+     {
+      "id": "a.md",
+      "label": "a",
+      "links": {
+       "b.md": 1
+      }
+     },
+     {
+      "id": "b.md",
+      "label": "b",
+      "links": {}
+     }
+    ],
+    {
+     "linkEdges": false
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "a.md",
+     "b.md"
+    ],
+    "edges": []
+   }
+  },
+  {
+   "name": "a zero link count is not an edge",
+   "args": [
+    [
+     {
+      "id": "a.md",
+      "label": "a",
+      "links": {
+       "b.md": 0
+      }
+     },
+     {
+      "id": "b.md",
+      "label": "b",
+      "links": {}
+     }
+    ],
+    {}
+   ],
+   "expected": {
+    "nodes": [
+     "a.md",
+     "b.md"
+    ],
+    "edges": []
+   }
+  },
+  {
+   "name": "an empty base gives an empty graph",
+   "args": [
+    [],
+    {
+     "sharedProps": [
+      "note.tags"
+     ]
+    }
+   ],
+   "expected": {
+    "nodes": [],
+    "edges": [],
+    "hidden": {
+     "orphans": 0,
+     "outside": 0
+    }
+   }
+  },
+  {
+   "name": "shared tags join every pair, case and # ignored",
+   "args": [
+    [
+     {
+      "id": "a.md",
+      "label": "a",
+      "links": {},
+      "props": {
+       "note.tags": [
+        "x",
+        "y"
+       ]
+      }
+     },
+     {
+      "id": "b.md",
+      "label": "b",
+      "links": {},
+      "props": {
+       "note.tags": [
+        "X"
+       ]
+      }
+     },
+     {
+      "id": "c.md",
+      "label": "c",
+      "links": {},
+      "props": {
+       "note.tags": [
+        "#x"
+       ]
+      }
+     },
+     {
+      "id": "d.md",
+      "label": "d",
+      "links": {},
+      "props": {
+       "note.tags": [
+        "y"
+       ]
+      }
+     }
+    ],
+    {
+     "sharedProps": [
+      "note.tags"
+     ]
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "a.md",
+     "b.md",
+     "c.md",
+     "d.md"
+    ],
+    "edges": [
+     [
+      0,
+      1,
+      "shared",
+      1,
+      "note.tags",
+      [
+       "x"
+      ]
+     ],
+     [
+      0,
+      2,
+      "shared",
+      1,
+      "note.tags",
+      [
+       "x"
+      ]
+     ],
+     [
+      1,
+      2,
+      "shared",
+      1,
+      "note.tags",
+      [
+       "x"
+      ]
+     ],
+     [
+      0,
+      3,
+      "shared",
+      1,
+      "note.tags",
+      [
+       "y"
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "name": "two shared values on one pair give one edge of weight 2",
+   "args": [
+    [
+     {
+      "id": "a.md",
+      "label": "a",
+      "links": {},
+      "props": {
+       "note.tags": [
+        "y",
+        "x"
+       ]
+      }
+     },
+     {
+      "id": "b.md",
+      "label": "b",
+      "links": {},
+      "props": {
+       "note.tags": [
+        "x",
+        "y"
+       ]
+      }
+     }
+    ],
+    {
+     "sharedProps": [
+      "note.tags"
+     ]
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "a.md",
+     "b.md"
+    ],
+    "edges": [
+     [
+      0,
+      1,
+      "shared",
+      2,
+      "note.tags",
+      [
+       "x",
+       "y"
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "name": "a value shared by more rows than maxGroup is joined as a chain",
+   "args": [
+    [
+     {
+      "id": "a.md",
+      "label": "a",
+      "links": {},
+      "props": {
+       "note.project": "P"
+      }
+     },
+     {
+      "id": "b.md",
+      "label": "b",
+      "links": {},
+      "props": {
+       "note.project": "P"
+      }
+     },
+     {
+      "id": "c.md",
+      "label": "c",
+      "links": {},
+      "props": {
+       "note.project": "P"
+      }
+     },
+     {
+      "id": "d.md",
+      "label": "d",
+      "links": {},
+      "props": {
+       "note.project": "P"
+      }
+     }
+    ],
+    {
+     "sharedProps": [
+      "note.project"
+     ],
+     "maxGroup": 3
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "a.md",
+     "b.md",
+     "c.md",
+     "d.md"
+    ],
+    "edges": [
+     [
+      0,
+      1,
+      "shared",
+      1,
+      "note.project",
+      [
+       "P"
+      ]
+     ],
+     [
+      1,
+      2,
+      "shared",
+      1,
+      "note.project",
+      [
+       "P"
+      ]
+     ],
+     [
+      2,
+      3,
+      "shared",
+      1,
+      "note.project",
+      [
+       "P"
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "name": "wikilink values compare by their target",
+   "args": [
+    [
+     {
+      "id": "a.md",
+      "label": "a",
+      "links": {},
+      "props": {
+       "note.project": "[[Alpha]]"
+      }
+     },
+     {
+      "id": "b.md",
+      "label": "b",
+      "links": {},
+      "props": {
+       "note.project": "[[Alpha|the alpha]]"
+      }
+     },
+     {
+      "id": "c.md",
+      "label": "c",
+      "links": {},
+      "props": {
+       "note.project": "alpha"
+      }
+     }
+    ],
+    {
+     "sharedProps": [
+      "note.project"
+     ]
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "a.md",
+     "b.md",
+     "c.md"
+    ],
+    "edges": [
+     [
+      0,
+      1,
+      "shared",
+      1,
+      "note.project",
+      [
+       "Alpha"
+      ]
+     ],
+     [
+      0,
+      2,
+      "shared",
+      1,
+      "note.project",
+      [
+       "Alpha"
+      ]
+     ],
+     [
+      1,
+      2,
+      "shared",
+      1,
+      "note.project",
+      [
+       "Alpha"
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "name": "empty and missing values never join",
+   "args": [
+    [
+     {
+      "id": "a.md",
+      "label": "a",
+      "links": {},
+      "props": {
+       "note.tags": [
+        ""
+       ]
+      }
+     },
+     {
+      "id": "b.md",
+      "label": "b",
+      "links": {},
+      "props": {
+       "note.tags": null
+      }
+     },
+     {
+      "id": "c.md",
+      "label": "c",
+      "links": {},
+      "props": {
+       "note.tags": [
+        " "
+       ]
+      }
+     },
+     {
+      "id": "d.md",
+      "label": "d",
+      "links": {}
+     }
+    ],
+    {
+     "sharedProps": [
+      "note.tags"
+     ]
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "a.md",
+     "b.md",
+     "c.md",
+     "d.md"
+    ],
+    "edges": []
+   }
+  },
+  {
+   "name": "a number and the same number as text join",
+   "args": [
+    [
+     {
+      "id": "a.md",
+      "label": "a",
+      "links": {},
+      "props": {
+       "note.rating": 3
+      }
+     },
+     {
+      "id": "b.md",
+      "label": "b",
+      "links": {},
+      "props": {
+       "note.rating": "3"
+      }
+     }
+    ],
+    {
+     "sharedProps": [
+      "note.rating"
+     ]
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "a.md",
+     "b.md"
+    ],
+    "edges": [
+     [
+      0,
+      1,
+      "shared",
+      1,
+      "note.rating",
+      [
+       "3"
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "name": "a link and a shared value on the same pair are two edges",
+   "args": [
+    [
+     {
+      "id": "a.md",
+      "label": "a",
+      "links": {
+       "b.md": 1
+      },
+      "props": {
+       "note.tags": [
+        "x"
+       ]
+      }
+     },
+     {
+      "id": "b.md",
+      "label": "b",
+      "links": {},
+      "props": {
+       "note.tags": [
+        "x"
+       ]
+      }
+     }
+    ],
+    {
+     "sharedProps": [
+      "note.tags"
+     ]
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "a.md",
+     "b.md"
+    ],
+    "edges": [
+     [
+      0,
+      1,
+      "link",
+      1,
+      false
+     ],
+     [
+      0,
+      1,
+      "shared",
+      1,
+      "note.tags",
+      [
+       "x"
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "name": "local depth 1 keeps the focus and its direct neighbours",
+   "args": [
+    [
+     {
+      "id": "a.md",
+      "label": "a",
+      "links": {
+       "b.md": 1
+      }
+     },
+     {
+      "id": "b.md",
+      "label": "b",
+      "links": {
+       "c.md": 1
+      }
+     },
+     {
+      "id": "c.md",
+      "label": "c",
+      "links": {
+       "d.md": 1
+      }
+     },
+     {
+      "id": "d.md",
+      "label": "d",
+      "links": {}
+     }
+    ],
+    {
+     "focus": "a.md",
+     "depth": 1
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "a.md",
+     "b.md"
+    ],
+    "edges": [
+     [
+      0,
+      1,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 2
+    }
+   }
+  },
+  {
+   "name": "local depth follows backlinks too",
+   "args": [
+    [
+     {
+      "id": "a.md",
+      "label": "a",
+      "links": {}
+     },
+     {
+      "id": "b.md",
+      "label": "b",
+      "links": {
+       "a.md": 1
+      }
+     },
+     {
+      "id": "c.md",
+      "label": "c",
+      "links": {
+       "b.md": 1
+      }
+     },
+     {
+      "id": "d.md",
+      "label": "d",
+      "links": {
+       "c.md": 1
+      }
+     }
+    ],
+    {
+     "focus": "a.md",
+     "depth": 2
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "a.md",
+     "b.md",
+     "c.md"
+    ],
+    "edges": [
+     [
+      1,
+      0,
+      "link",
+      1,
+      false
+     ],
+     [
+      2,
+      1,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 1
+    }
+   }
+  },
+  {
+   "name": "a focus that is not in the base shows every row",
+   "args": [
+    [
+     {
+      "id": "a.md",
+      "label": "a",
+      "links": {
+       "b.md": 1
+      }
+     },
+     {
+      "id": "b.md",
+      "label": "b",
+      "links": {}
+     },
+     {
+      "id": "c.md",
+      "label": "c",
+      "links": {}
+     }
+    ],
+    {
+     "focus": "zzz.md",
+     "depth": 2
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "a.md",
+     "b.md",
+     "c.md"
+    ],
+    "edges": [
+     [
+      0,
+      1,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 0
+    }
+   }
+  },
+  {
+   "name": "local depth is capped at 5",
+   "args": [
+    [
+     {
+      "id": "n0.md",
+      "label": "n0",
+      "links": {
+       "n1.md": 1
+      }
+     },
+     {
+      "id": "n1.md",
+      "label": "n1",
+      "links": {
+       "n2.md": 1
+      }
+     },
+     {
+      "id": "n2.md",
+      "label": "n2",
+      "links": {
+       "n3.md": 1
+      }
+     },
+     {
+      "id": "n3.md",
+      "label": "n3",
+      "links": {
+       "n4.md": 1
+      }
+     },
+     {
+      "id": "n4.md",
+      "label": "n4",
+      "links": {
+       "n5.md": 1
+      }
+     },
+     {
+      "id": "n5.md",
+      "label": "n5",
+      "links": {
+       "n6.md": 1
+      }
+     },
+     {
+      "id": "n6.md",
+      "label": "n6",
+      "links": {
+       "n7.md": 1
+      }
+     },
+     {
+      "id": "n7.md",
+      "label": "n7",
+      "links": {}
+     }
+    ],
+    {
+     "focus": "n0.md",
+     "depth": 9
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "n0.md",
+     "n1.md",
+     "n2.md",
+     "n3.md",
+     "n4.md",
+     "n5.md"
+    ],
+    "edges": [
+     [
+      0,
+      1,
+      "link",
+      1,
+      false
+     ],
+     [
+      1,
+      2,
+      "link",
+      1,
+      false
+     ],
+     [
+      2,
+      3,
+      "link",
+      1,
+      false
+     ],
+     [
+      3,
+      4,
+      "link",
+      1,
+      false
+     ],
+     [
+      4,
+      5,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 2
+    }
+   }
+  },
+  {
+   "name": "rows outside the depth are not counted as orphans",
+   "args": [
+    [
+     {
+      "id": "a.md",
+      "label": "a",
+      "links": {
+       "b.md": 1
+      }
+     },
+     {
+      "id": "b.md",
+      "label": "b",
+      "links": {}
+     },
+     {
+      "id": "c.md",
+      "label": "c",
+      "links": {}
+     }
+    ],
+    {
+     "focus": "a.md",
+     "depth": 1,
+     "showOrphans": false
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "a.md",
+     "b.md"
+    ],
+    "edges": [
+     [
+      0,
+      1,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 1
+    }
+   }
+  },
+  {
+   "name": "local depth uses shared value edges",
+   "args": [
+    [
+     {
+      "id": "a.md",
+      "label": "a",
+      "links": {},
+      "props": {
+       "note.team": "red"
+      }
+     },
+     {
+      "id": "b.md",
+      "label": "b",
+      "links": {},
+      "props": {
+       "note.team": "Red"
+      }
+     },
+     {
+      "id": "c.md",
+      "label": "c",
+      "links": {},
+      "props": {
+       "note.team": "blue"
+      }
+     }
+    ],
+    {
+     "sharedProps": [
+      "note.team"
+     ],
+     "focus": "a.md",
+     "depth": 1
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "a.md",
+     "b.md"
+    ],
+    "edges": [
+     [
+      0,
+      1,
+      "shared",
+      1,
+      "note.team",
+      [
+       "red"
+      ]
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 1
+    }
+   }
+  },
+  {
+   "name": "size follows the square root of the value",
+   "function": "sizeScale",
+   "args": [
+    [
+     0,
+     25,
+     100,
+     null
+    ],
+    {
+     "min": 4,
+     "max": 16
+    }
+   ],
+   "expected": [
+    4,
+    10,
+    16,
+    4
+   ]
+  },
+  {
+   "name": "equal values get the middle size, no value the fallback",
+   "function": "sizeScale",
+   "args": [
+    [
+     5,
+     null
+    ],
+    {
+     "min": 4,
+     "max": 16,
+     "fallback": 3
+    }
+   ],
+   "expected": [
+    10,
+    3
+   ]
+  },
+  {
+   "name": "no numbers at all gives the fallback for every row",
+   "function": "sizeScale",
+   "args": [
+    [
+     null,
+     null
+    ],
+    {}
+   ],
+   "expected": [
+    4,
+    4
+   ]
+  },
+  {
+   "name": "negative values scale from the smallest",
+   "function": "sizeScale",
+   "args": [
+    [
+     -10,
+     -1,
+     8
+    ],
+    {
+     "min": 2,
+     "max": 20
+    }
+   ],
+   "expected": [
+    2,
+    14.73,
+    20
+   ]
+  },
+  {
+   "name": "categories by count, then by name; no value last",
+   "function": "colorScale",
+   "args": [
+    [
+     "done",
+     "open",
+     "Done",
+     null,
+     "later"
+    ],
+    {}
+   ],
+   "expected": {
+    "kind": "category",
+    "slots": [
+     0,
+     2,
+     0,
+     -1,
+     1
+    ],
+    "legend": [
+     {
+      "label": "done",
+      "count": 2,
+      "slot": 0
+     },
+     {
+      "label": "later",
+      "count": 1,
+      "slot": 1
+     },
+     {
+      "label": "open",
+      "count": 1,
+      "slot": 2
+     },
+     {
+      "label": "(no value)",
+      "count": 1,
+      "slot": -1
+     }
+    ]
+   }
+  },
+  {
+   "name": "more categories than slots share the last slot as Other",
+   "function": "colorScale",
+   "args": [
+    [
+     "a",
+     "a",
+     "b",
+     "c",
+     "d"
+    ],
+    {
+     "slots": 3
+    }
+   ],
+   "expected": {
+    "kind": "category",
+    "slots": [
+     0,
+     0,
+     1,
+     2,
+     2
+    ],
+    "legend": [
+     {
+      "label": "a",
+      "count": 2,
+      "slot": 0
+     },
+     {
+      "label": "b",
+      "count": 1,
+      "slot": 1
+     },
+     {
+      "label": "Other",
+      "count": 2,
+      "slot": 2
+     }
+    ]
+   }
+  },
+  {
+   "name": "many distinct numbers become equal-width ranges",
+   "function": "colorScale",
+   "args": [
+    [
+     1,
+     2,
+     3,
+     4,
+     5,
+     10
+    ],
+    {
+     "slots": 4,
+     "bins": 2
+    }
+   ],
+   "expected": {
+    "kind": "number",
+    "slots": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     1
+    ],
+    "legend": [
+     {
+      "label": "1 to 5.5",
+      "count": 5,
+      "slot": 0
+     },
+     {
+      "label": "5.5 to 10",
+      "count": 1,
+      "slot": 1
+     }
+    ]
+   }
+  },
+  {
+   "name": "few distinct numbers stay categories",
+   "function": "colorScale",
+   "args": [
+    [
+     1,
+     2,
+     2
+    ],
+    {}
+   ],
+   "expected": {
+    "kind": "category",
+    "slots": [
+     1,
+     0,
+     0
+    ],
+    "legend": [
+     {
+      "label": "2",
+      "count": 2,
+      "slot": 0
+     },
+     {
+      "label": "1",
+      "count": 1,
+      "slot": 1
+     }
+    ]
+   }
+  },
+  {
+   "name": "a list uses its first value",
+   "function": "colorScale",
+   "args": [
+    [
+     [
+      "x",
+      "y"
+     ],
+     [
+      "y"
+     ],
+     []
+    ],
+    {}
+   ],
+   "expected": {
+    "kind": "category",
+    "slots": [
+     0,
+     1,
+     -1
+    ],
+    "legend": [
+     {
+      "label": "x",
+      "count": 1,
+      "slot": 0
+     },
+     {
+      "label": "y",
+      "count": 1,
+      "slot": 1
+     },
+     {
+      "label": "(no value)",
+      "count": 1,
+      "slot": -1
+     }
+    ]
+   }
+  },
+  {
+   "name": "no values at all",
+   "function": "colorScale",
+   "args": [
+    [
+     null,
+     ""
+    ],
+    {}
+   ],
+   "expected": {
+    "kind": "none",
+    "slots": [
+     -1,
+     -1
+    ],
+    "legend": [
+     {
+      "label": "(no value)",
+      "count": 2,
+      "slot": -1
+     }
+    ]
+   }
+  },
+  {
+   "name": "parseNumber \"1,200.5\"",
+   "function": "parseNumber",
+   "args": [
+    "1,200.5"
+   ],
+   "expected": 1200.5
+  },
+  {
+   "name": "parseNumber \"$3.50\"",
+   "function": "parseNumber",
+   "args": [
+    "$3.50"
+   ],
+   "expected": 3.5
+  },
+  {
+   "name": "parseNumber \"12 %\"",
+   "function": "parseNumber",
+   "args": [
+    "12 %"
+   ],
+   "expected": 12
+  },
+  {
+   "name": "parseNumber \"-4\"",
+   "function": "parseNumber",
+   "args": [
+    "-4"
+   ],
+   "expected": -4
+  },
+  {
+   "name": "parseNumber \"2026-10-10\"",
+   "function": "parseNumber",
+   "args": [
+    "2026-10-10"
+   ],
+   "expected": null
+  },
+  {
+   "name": "parseNumber \"abc\"",
+   "function": "parseNumber",
+   "args": [
+    "abc"
+   ],
+   "expected": null
+  },
+  {
+   "name": "parseNumber [\"7\"]",
+   "function": "parseNumber",
+   "args": [
+    [
+     "7"
+    ]
+   ],
+   "expected": 7
+  },
+  {
+   "name": "parseNumber true",
+   "function": "parseNumber",
+   "args": [
+    true
+   ],
+   "expected": 1
+  },
+  {
+   "name": "parseNumber \"\"",
+   "function": "parseNumber",
+   "args": [
+    ""
+   ],
+   "expected": null
+  },
+  {
+   "name": "parseNumber \"1,20\"",
+   "function": "parseNumber",
+   "args": [
+    "1,20"
+   ],
+   "expected": null
+  }
+ ]
+}

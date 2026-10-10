@@ -1,0 +1,22 @@
+filters:
+  and:
+    - file.inFolder("Bases Link Graph/Notes")
+views:
+  - type: bases-link-graph
+    name: Graph
+  - type: bases-link-graph
+    name: By type
+    graphColorBy: note.type
+    graphSizeBy: note.hours
+  - type: bases-link-graph
+    name: Shared teams
+    graphColorBy: note.type
+    graphSharedProps:
+      - team
+  - type: bases-link-graph
+    name: Near Atlas
+    graphFocus: Bases Link Graph/Notes/Atlas.md
+    graphDepth: 1
+    graphColorBy: note.type
+  - type: table
+    name: Table

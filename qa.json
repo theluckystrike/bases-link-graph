@@ -1,0 +1,92 @@
+[
+	{
+		"feature": "graph",
+		"caption": "The 30 notes of a team base as a graph: projects, people and meetings, joined by their links.",
+		"note": "Team graph.base",
+		"eval": "(async () => { app.plugins.plugins['bases-link-graph'].pro.signOut(); await app.workspace.openLinkText('Bases Link Graph/Team graph.base#Graph', '', false); await new Promise((r) => setTimeout(r, 1500)); return 'ok'; })()",
+		"wait": 800
+	},
+	{
+		"feature": "hover",
+		"caption": "Hover a note to light up its links and see its name. Click it to open the note.",
+		"note": "Team graph.base",
+		"eval": "(async () => { app.plugins.plugins['bases-link-graph'].pro.signOut(); await app.workspace.openLinkText('Bases Link Graph/Team graph.base#Graph', '', false); await new Promise((r) => setTimeout(r, 1500)); const v = [...app.plugins.plugins['bases-link-graph'].views].filter((v) => v.containerEl.isConnected && v.containerEl.offsetParent !== null && v.graph).pop(); const p = v.screenPos('Bases Link Graph/Notes/Atlas.md'); const c = v.containerEl.querySelector('canvas'); const r = c.getBoundingClientRect(); c.dispatchEvent(new PointerEvent('pointermove', { clientX: r.left + p.x, clientY: r.top + p.y, bubbles: true })); await new Promise((r) => setTimeout(r, 300)); return 'ok'; })()",
+		"wait": 500
+	},
+	{
+		"feature": "embedded",
+		"caption": "The graph embedded in a weekly review note.",
+		"note": "Weekly review.md",
+		"eval": "(async () => { app.plugins.plugins['bases-link-graph'].pro.signOut(); await new Promise((r) => setTimeout(r, 1500)); return 'ok'; })()",
+		"wait": 800
+	},
+	{
+		"feature": "size-color",
+		"caption": "Pro: color by type with a legend, size by hours.",
+		"note": "Team graph.base",
+		"eval": "(async () => { app.plugins.plugins['bases-link-graph'].pro.opts.http = async () => ({ status: 200, json: { data: { viewer: { login: 'demo-reader' }, user: { sponsorshipForViewerAsSponsor: { isActive: true, isOneTimePayment: false, tier: { name: '$5 a month', monthlyPriceInCents: 500 } } } } } }); app.secretStorage.setSecret('bases-link-graph-github-token', 'gho_' + '0'.repeat(36)); await app.plugins.plugins['bases-link-graph'].pro.refreshNow(); await app.workspace.openLinkText('Bases Link Graph/Team graph.base#By type', '', false); await new Promise((r) => setTimeout(r, 300)); await new Promise((r) => setTimeout(r, 1500)); return 'ok'; })()",
+		"wait": 800,
+		"after": "(async () => { app.plugins.plugins['bases-link-graph'].pro.signOut(); return 'ok'; })()"
+	},
+	{
+		"feature": "shared-values",
+		"caption": "Pro: dashed edges join the notes that share a team.",
+		"note": "Team graph.base",
+		"eval": "(async () => { app.plugins.plugins['bases-link-graph'].pro.opts.http = async () => ({ status: 200, json: { data: { viewer: { login: 'demo-reader' }, user: { sponsorshipForViewerAsSponsor: { isActive: true, isOneTimePayment: false, tier: { name: '$5 a month', monthlyPriceInCents: 500 } } } } } }); app.secretStorage.setSecret('bases-link-graph-github-token', 'gho_' + '0'.repeat(36)); await app.plugins.plugins['bases-link-graph'].pro.refreshNow(); await app.workspace.openLinkText('Bases Link Graph/Team graph.base#Shared teams', '', false); await new Promise((r) => setTimeout(r, 1500)); return 'ok'; })()",
+		"wait": 800,
+		"after": "(async () => { app.plugins.plugins['bases-link-graph'].pro.signOut(); return 'ok'; })()"
+	},
+	{
+		"feature": "local-depth",
+		"caption": "Pro: only Atlas and the notes one link away.",
+		"note": "Team graph.base",
+		"eval": "(async () => { app.plugins.plugins['bases-link-graph'].pro.opts.http = async () => ({ status: 200, json: { data: { viewer: { login: 'demo-reader' }, user: { sponsorshipForViewerAsSponsor: { isActive: true, isOneTimePayment: false, tier: { name: '$5 a month', monthlyPriceInCents: 500 } } } } } }); app.secretStorage.setSecret('bases-link-graph-github-token', 'gho_' + '0'.repeat(36)); await app.plugins.plugins['bases-link-graph'].pro.refreshNow(); await app.workspace.openLinkText('Bases Link Graph/Team graph.base#Near Atlas', '', false); await new Promise((r) => setTimeout(r, 1500)); return 'ok'; })()",
+		"wait": 800,
+		"after": "(async () => { app.plugins.plugins['bases-link-graph'].pro.signOut(); return 'ok'; })()"
+	},
+	{
+		"feature": "export",
+		"caption": "Pro: the graph exported to an SVG image with its legend, opened in a new tab.",
+		"note": "Team graph.base",
+		"eval": "(async () => { app.plugins.plugins['bases-link-graph'].pro.opts.http = async () => ({ status: 200, json: { data: { viewer: { login: 'demo-reader' }, user: { sponsorshipForViewerAsSponsor: { isActive: true, isOneTimePayment: false, tier: { name: '$5 a month', monthlyPriceInCents: 500 } } } } } }); app.secretStorage.setSecret('bases-link-graph-github-token', 'gho_' + '0'.repeat(36)); await app.plugins.plugins['bases-link-graph'].pro.refreshNow(); await app.workspace.openLinkText('Bases Link Graph/Team graph.base#By type', '', false); await new Promise((r) => setTimeout(r, 1500)); const f = await app.plugins.plugins['bases-link-graph'].exportView(app.plugins.plugins['bases-link-graph'].targetView(), 'svg'); window.__blgExport = f.path; await app.workspace.getLeaf('tab').openFile(f); await new Promise((r) => setTimeout(r, 800)); return 'ok'; })()",
+		"wait": 800,
+		"after": "(async () => { const f = app.vault.getFileByPath(window.__blgExport); app.workspace.getMostRecentLeaf()?.detach(); if (f) await app.vault.delete(f); await app.workspace.openLinkText('Bases Link Graph/Team graph.base#Graph', '', false); app.plugins.plugins['bases-link-graph'].pro.signOut(); return 'ok'; })()"
+	},
+	{
+		"feature": "settings",
+		"caption": "Settings after sign in: the Pro section with the GitHub account and status, animation and live update delay.",
+		"eval": "(async () => { app.plugins.plugins['bases-link-graph'].pro.opts.http = async () => ({ status: 200, json: { data: { viewer: { login: 'demo-reader' }, user: { sponsorshipForViewerAsSponsor: { isActive: true, isOneTimePayment: false, tier: { name: '$5 a month', monthlyPriceInCents: 500 } } } } } }); app.secretStorage.setSecret('bases-link-graph-github-token', 'gho_' + '0'.repeat(36)); await app.plugins.plugins['bases-link-graph'].pro.refreshNow(); app.setting.open(); app.setting.openTabById('bases-link-graph'); await new Promise((r) => setTimeout(r, 500)); return 'ok'; })()",
+		"after": "app.setting.close(); app.plugins.plugins['bases-link-graph'].pro.signOut(); 'ok'"
+	},
+	{
+		"feature": "bases-link-graph",
+		"caption": "Open the base, hover a note, then switch to the Pro views: color by type, shared teams, local depth.",
+		"frames": [
+			{
+				"note": "Team graph.base",
+				"eval": "(async () => { app.plugins.plugins['bases-link-graph'].pro.signOut(); await app.workspace.openLinkText('Bases Link Graph/Team graph.base#Graph', '', false); await new Promise((r) => setTimeout(r, 1500)); return 'ok'; })()",
+				"hold": 1800
+			},
+			{
+				"eval": "(async () => { const v = [...app.plugins.plugins['bases-link-graph'].views].filter((v) => v.containerEl.isConnected && v.containerEl.offsetParent !== null && v.graph).pop(); const p = v.screenPos('Bases Link Graph/Notes/Atlas.md'); const c = v.containerEl.querySelector('canvas'); const r = c.getBoundingClientRect(); c.dispatchEvent(new PointerEvent('pointermove', { clientX: r.left + p.x, clientY: r.top + p.y, bubbles: true })); await new Promise((r) => setTimeout(r, 300)); return 'ok'; })()",
+				"hold": 1600
+			},
+			{
+				"eval": "(async () => { app.plugins.plugins['bases-link-graph'].pro.opts.http = async () => ({ status: 200, json: { data: { viewer: { login: 'demo-reader' }, user: { sponsorshipForViewerAsSponsor: { isActive: true, isOneTimePayment: false, tier: { name: '$5 a month', monthlyPriceInCents: 500 } } } } } }); app.secretStorage.setSecret('bases-link-graph-github-token', 'gho_' + '0'.repeat(36)); await app.plugins.plugins['bases-link-graph'].pro.refreshNow(); await app.workspace.openLinkText('Bases Link Graph/Team graph.base#By type', '', false); await new Promise((r) => setTimeout(r, 1500)); return 'ok'; })()",
+				"hold": 1800
+			},
+			{
+				"eval": "(async () => { await app.workspace.openLinkText('Bases Link Graph/Team graph.base#Shared teams', '', false); await new Promise((r) => setTimeout(r, 1500)); return 'ok'; })()",
+				"hold": 1800
+			},
+			{
+				"eval": "(async () => { await app.workspace.openLinkText('Bases Link Graph/Team graph.base#Near Atlas', '', false); await new Promise((r) => setTimeout(r, 1500)); return 'ok'; })()",
+				"hold": 1800
+			},
+			{
+				"eval": "(async () => { await app.workspace.openLinkText('Bases Link Graph/Team graph.base#Graph', '', false); app.plugins.plugins['bases-link-graph'].pro.signOut(); await new Promise((r) => setTimeout(r, 1500)); return 'ok'; })()",
+				"hold": 600
+			}
+		]
+	}
+]

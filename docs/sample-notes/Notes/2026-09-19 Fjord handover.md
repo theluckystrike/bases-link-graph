@@ -1,5 +1,6 @@
 ---
 type: meeting
+project: "[[Fjord]]"
 date: 2026-09-19
 team:
   - Platform

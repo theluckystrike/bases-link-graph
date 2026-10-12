@@ -1,5 +1,6 @@
 ---
 type: meeting
+project: "[[Ember]]"
 date: 2026-09-17
 team:
   - Research

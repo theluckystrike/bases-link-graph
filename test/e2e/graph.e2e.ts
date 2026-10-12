@@ -11,6 +11,7 @@ const ATLAS = `${DIR}/Notes/Atlas.md`;
 interface ViewState {
 	rows: number;
 	nodes: number;
+	labels: string[];
 	links: number;
 	shared: number;
 	outside: number;
@@ -27,7 +28,7 @@ interface ViewState {
 async function viewState(): Promise<ViewState | null> {
 	return browser.executeObsidian(({ app }, id) => {
 		interface V {
-			graph: { nodes: unknown[]; edges: { kind: string }[]; hidden: { outside: number } } | null;
+			graph: { nodes: { label: string }[]; edges: { kind: string }[]; hidden: { outside: number } } | null;
 			data: { data: unknown[] };
 			layout: { alpha: number; alphaMin: number; alphaTarget: number } | null;
 			stats: ViewState['stats'];
@@ -43,6 +44,7 @@ async function viewState(): Promise<ViewState | null> {
 		return {
 			rows: v.data.data.length,
 			nodes: v.graph.nodes.length,
+			labels: v.graph.nodes.map((n) => n.label),
 			links: v.graph.edges.filter((e) => e.kind === 'link').length,
 			shared: v.graph.edges.filter((e) => e.kind === 'shared').length,
 			outside: v.graph.hidden.outside,
@@ -129,7 +131,9 @@ describe(`${pluginId} in the real app`, function () {
 
 	it('draws one node per row of the base: 30 notes, 55 links', async function () {
 		await obsidianPage.openFile(BASE);
-		const s = await waitFor((x) => x.nodes === 30 && x.cooled, 'expected 30 nodes and a settled layout');
+		// The first build can run before the metadata cache resolves every link, so the link count of that
+		// build can be low. Wait for the pinned link count of the sample: the cache has then resolved all 55.
+		const s = await waitFor((x) => x.nodes === 30 && x.links === 55 && x.cooled, 'expected 30 nodes, 55 resolved links and a settled layout');
 		expect(s.nodes).toBe(s.rows);
 		expect(s.links).toBe(55);
 		expect(s.shared).toBe(0);
@@ -145,6 +149,59 @@ describe(`${pluginId} in the real app`, function () {
 		expect(pt!.hit).toBe(ATLAS);
 		await browser.action('pointer').move({ x: pt!.x, y: pt!.y }).down({ button: 0 }).pause(60).up({ button: 0 }).perform();
 		await browser.waitUntil(async () => (await browser.executeObsidian(({ app }) => app.workspace.getActiveFile()?.path ?? '')) === ATLAS, { timeout: 10000, timeoutMsg: 'Atlas did not open' });
+	});
+
+	it('free link-source filter selects properties, persists on reload and switches to body links', async function () {
+		await setPro(false);
+		await openEmbed('Project links');
+		const property = await waitFor((x) => x.nodes === 16 && x.links === 10, 'expected 10 project links and their 16 notes');
+		expect(property.rows).toBe(30);
+		expect(property.proNote).toBe(false);
+		expect((await reloadPlugin(pluginId)).errors).toEqual([]);
+		// Bases does not recreate an open Markdown embed after a plugin reload. Reopen the note to read its saved view.
+		await obsidianPage.openFile('Welcome.md');
+		await openEmbed('Project links');
+		await waitFor((x) => x.nodes === 16 && x.links === 10, 'property filter did not survive reload');
+		async function source(mode: string, properties: string[]) {
+			await browser.executeObsidian(({ app }, id, mode, properties) => {
+				interface V {
+					containerEl: HTMLElement;
+					graph: unknown;
+					config: { set(key: string, value: unknown): void };
+					schedule(delay: number): void;
+				}
+				const p = (app as unknown as { plugins: { plugins: Record<string, { views: Set<V> }> } }).plugins.plugins[id]!;
+				const v = [...p.views].filter((v) => v.containerEl.isConnected && v.containerEl.offsetParent !== null && v.graph).pop()!;
+				v.config.set('graphLinkSource', mode);
+				v.config.set('graphLinkProperties', properties);
+				v.schedule(0);
+			}, pluginId, mode, properties);
+		}
+		const kickoff = `${DIR}/Notes/2026-09-01 Atlas kickoff.md`;
+		const before = await obsidianPage.read(kickoff);
+		try {
+			await source('body', ['project']);
+			await waitFor((x) => x.nodes === 29 && x.links === 55, 'body links should exclude properties');
+			await source('frontmatter', ['missing']);
+			await waitFor((x) => x.nodes === 0 && x.links === 0, 'missing property should give no edges');
+			await source('frontmatter', []);
+			await waitFor((x) => x.nodes === 16 && x.links === 10, 'empty list should select all property links');
+			await obsidianPage.write(kickoff, before.replace('---\n', '---\nrelated:\n  - "[[Ben]]"\n  - "[[Chen#Heading|C]]"\n  - "[[Missing]]"\n  - "[[Archive/Old plan]]"\n'));
+			await source('frontmatter', ['related']);
+			await waitFor((x) => x.nodes === 3 && x.links === 2 && x.labels.includes('Ben') && x.labels.includes('Chen'), 'list links should resolve aliases and exclude targets outside the base');
+			await obsidianPage.write(kickoff, before.replace('---\n', '---\nrelated: "[[Lena]]"\n'));
+			await waitFor((x) => x.nodes === 2 && x.links === 1 && x.labels.includes('Lena'), 'property edit did not update the filtered graph');
+			// The README says that names are case sensitive. The cache key keeps the case of the property.
+			await obsidianPage.write(kickoff, before.replace('---\n', '---\nRelated: "[[Lena]]"\n'));
+			await waitFor((x) => x.nodes === 0 && x.links === 0, 'a lower case name should not select a mixed case property');
+			await source('frontmatter', ['Related']);
+			await waitFor((x) => x.nodes === 2 && x.links === 1 && x.labels.includes('Lena'), 'the exact name should select a mixed case property');
+			await source('body', ['related']);
+			await waitFor((x) => x.nodes === 29 && x.links === 55 && !x.labels.includes('Lena'), 'body mode should exclude the new property link');
+		} finally {
+			await obsidianPage.write(kickoff, before);
+			await source('frontmatter', ['project']);
+		}
 	});
 
 	it('hover shows the tooltip with the note name', async function () {

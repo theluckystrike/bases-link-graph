@@ -7,6 +7,13 @@
 		"wait": 800
 	},
 	{
+		"feature": "link-source",
+		"caption": "The free view shows only links from the project property.",
+		"note": "Team graph.base",
+		"eval": "(async () => { app.plugins.plugins['bases-link-graph'].pro.signOut(); await app.workspace.openLinkText('Bases Link Graph/Team graph.base#Project links', '', false); await new Promise((r) => setTimeout(r, 1800)); const v = [...app.plugins.plugins['bases-link-graph'].views].filter((v) => v.containerEl.isConnected && v.containerEl.offsetParent !== null && v.graph).pop(); if (v.graph.nodes.length !== 16 || v.graph.edges.length !== 10 || v.opts.linkSource !== 'frontmatter') throw new Error('Wrong property-link graph'); const positions = { 'Atlas': [0, 100], '2026-09-01 Atlas kickoff': [-60, 0], '2026-09-08 Atlas design review': [60, 200], '2026-09-22 Atlas planning': [-60, 300], 'Beacon': [450, 100], '2026-09-03 Beacon interviews': [390, 0], '2026-09-15 Beacon findings': [510, 200], 'Cobalt': [900, 100], '2026-09-10 Cobalt scoping': [840, 200], 'Delta': [0, 500], '2026-09-12 Delta retro': [-60, 400], '2026-09-29 Delta follow-up': [60, 600], 'Ember': [450, 500], '2026-09-17 Ember idea': [510, 600], 'Fjord': [900, 500], '2026-09-19 Fjord handover': [840, 600] }; v.graph.nodes.forEach((n, i) => { const p = positions[n.label]; v.layout.x[i] = p[0]; v.layout.y[i] = p[1]; }); v.layout.alpha = 0; v.layout.alphaTarget = 0; v.fit(); v.draw(); return '16 notes, 10 project links, Pro off'; })()",
+		"wait": 800
+	},
+	{
 		"feature": "hover",
 		"caption": "Hover a note to light up its links and see its name. Click it to open the note.",
 		"note": "Team graph.base",

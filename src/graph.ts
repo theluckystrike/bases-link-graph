@@ -6,6 +6,27 @@
 export type Scalar = string | number | boolean;
 export type PropValue = Scalar | Scalar[] | null;
 
+export type LinkSource = 'all' | 'body' | 'frontmatter';
+
+export interface ResolvedReference {
+	target: string | null;
+	/** The cache key for a property link. Body links have no key. */
+	key?: string;
+}
+
+/** Count resolved references, with an optional filter for frontmatter property names. */
+export function linkCounts(refs: ResolvedReference[], properties: string[] = []): Record<string, number> {
+	const names = properties.map((p) => p.trim().replace(/^note\./, '')).filter(Boolean);
+	const counts = new Map<string, number>();
+	for (const ref of refs) {
+		if (!ref.target) continue;
+		// List and object links can have a cache key such as "parent.0" or "parent,0".
+		if (names.length > 0 && !names.some((p) => ref.key === p || ref.key?.startsWith(`${p}.`) || ref.key?.startsWith(`${p},`))) continue;
+		counts.set(ref.target, (counts.get(ref.target) ?? 0) + 1);
+	}
+	return Object.fromEntries(counts);
+}
+
 /** One row of the base. `links` = resolved link targets (vault paths) with the number of links to each. */
 export interface NodeInput {
 	id: string;

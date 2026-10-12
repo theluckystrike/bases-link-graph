@@ -1,5 +1,5 @@
-import { BasesView, Keymap, Menu, Notice, setIcon, type BasesAllOptions, type BasesPropertyId, type BasesViewConfig, type HoverParent, type HoverPopover, type QueryController } from 'obsidian';
-import { buildGraph, colorScale, parseNumber, sizeScale, type ColorResult, type Graph, type NodeInput, type PropValue } from './graph';
+import { BasesView, Keymap, Menu, Notice, parseLinktext, setIcon, type BasesAllOptions, type BasesPropertyId, type BasesViewConfig, type HoverParent, type HoverPopover, type MetadataCache, type QueryController, type TFile } from 'obsidian';
+import { buildGraph, colorScale, linkCounts, parseNumber, sizeScale, type ColorResult, type Graph, type LinkSource, type NodeInput, type PropValue } from './graph';
 import { bounds, createLayout, hitTest, reheat, run, tick, type LayoutState } from './layout';
 import { isPro, onProChange } from './pro';
 import { readTheme, type Theme } from './theme';
@@ -11,6 +11,8 @@ export const KEY = {
 	labels: 'graphLabels',
 	orphans: 'graphOrphans',
 	spacing: 'graphSpacing',
+	linkSource: 'graphLinkSource',
+	linkProperties: 'graphLinkProperties',
 	sizeBy: 'graphSizeBy',
 	colorBy: 'graphColorBy',
 	shared: 'graphSharedProps',
@@ -25,6 +27,8 @@ export interface ViewOptions {
 	labels: Labels;
 	showOrphans: boolean;
 	spacing: number;
+	linkSource: LinkSource;
+	linkProperties: string[];
 	sizeBy: BasesPropertyId | null;
 	colorBy: BasesPropertyId | null;
 	shared: BasesPropertyId[];
@@ -78,6 +82,17 @@ interface Pointer {
 	startY: number;
 	moved: boolean;
 	wasFixed: boolean;
+}
+
+/** Resolve links through the public metadata cache, with the source note as context. */
+export function linksForFile(cache: MetadataCache, file: TFile, source: LinkSource, properties: string[]): Record<string, number> {
+	if (source === 'all') return cache.resolvedLinks[file.path] ?? {};
+	const meta = cache.getFileCache(file);
+	const refs = source === 'frontmatter' ? (meta?.frontmatterLinks ?? []) : [...(meta?.links ?? []), ...(meta?.embeds ?? [])];
+	return linkCounts(refs.map((ref) => ({
+		target: cache.getFirstLinkpathDest(parseLinktext(ref.link).path, file.path)?.path ?? null,
+		key: 'key' in ref ? ref.key : undefined,
+	})), source === 'frontmatter' ? properties : []);
 }
 
 /** Bases view that draws the notes of a base as a force-directed graph on a canvas. */
@@ -167,6 +182,8 @@ export class GraphView extends BasesView implements HoverParent {
 		const pro = isPro();
 		const labels = c.get(KEY.labels);
 		const spacing = Number(c.get(KEY.spacing));
+		const linkSource = c.get(KEY.linkSource);
+		const linkProperties = c.get(KEY.linkProperties);
 		const depth = Number(c.get(KEY.depth));
 		const focus = c.get(KEY.focus);
 		const layout = c.get(KEY.layout);
@@ -180,6 +197,8 @@ export class GraphView extends BasesView implements HoverParent {
 			labels: labels === 'always' || labels === 'hover' ? labels : 'auto',
 			showOrphans: c.get(KEY.orphans) !== false,
 			spacing: Number.isFinite(spacing) && spacing >= 20 && spacing <= 200 ? spacing : 60,
+			linkSource: linkSource === 'body' || linkSource === 'frontmatter' ? linkSource : 'all',
+			linkProperties: Array.isArray(linkProperties) ? linkProperties.filter((p): p is string => typeof p === 'string' && p.trim() !== '') : [],
 			sizeBy: pro ? sizeBy : null,
 			colorBy: pro ? colorBy : null,
 			shared: pro ? shared : [],
@@ -193,11 +212,10 @@ export class GraphView extends BasesView implements HoverParent {
 	/** Rows of the base as graph input: path, name, resolved links and the property values that the options use. */
 	private input(opts: ViewOptions): NodeInput[] {
 		const props = [opts.sizeBy, opts.colorBy, ...opts.shared].filter((p): p is BasesPropertyId => p !== null);
-		const links = this.app.metadataCache.resolvedLinks;
 		return this.data.data.map((e) => {
 			const values: Record<string, PropValue> = {};
 			for (const p of props) values[p] = toPlain(e.getValue(p));
-			return { id: e.file.path, label: e.file.basename, links: links[e.file.path] ?? {}, props: values };
+			return { id: e.file.path, label: e.file.basename, links: linksForFile(this.app.metadataCache, e.file, opts.linkSource, opts.linkProperties), props: values };
 		});
 	}
 
@@ -563,6 +581,8 @@ export class GraphView extends BasesView implements HoverParent {
 		const shared = g.edges.length - links;
 		const parts = [`${g.nodes.length} ${g.nodes.length === 1 ? 'note' : 'notes'}`, `${links} ${links === 1 ? 'link' : 'links'}`];
 		if (shared > 0) parts.push(`${shared} shared values`);
+		if (o.linkSource === 'body') parts.push('Body links only');
+		if (o.linkSource === 'frontmatter') parts.push(o.linkProperties.length > 0 ? `Properties: ${o.linkProperties.join(', ')}` : 'Property links only');
 		if (g.hidden.orphans > 0) parts.push(`${g.hidden.orphans} without links hidden`);
 		this.bar.createSpan({ cls: 'bases-link-graph-count', text: parts.join(' · ') });
 		if (o.focus) {
@@ -635,11 +655,12 @@ export class GraphView extends BasesView implements HoverParent {
 
 /** The options shown in the view options menu of the base. */
 export function viewOptions(config: BasesViewConfig): BasesAllOptions[] {
-	void config;
 	return [
 		{ type: 'dropdown', key: KEY.labels, displayName: 'Labels', default: 'auto', options: { auto: 'When zoomed in', always: 'Always', hover: 'On hover only' } },
 		{ type: 'toggle', key: KEY.orphans, displayName: 'Show notes without links', default: true },
 		{ type: 'slider', key: KEY.spacing, displayName: 'Link length', default: 60, min: 20, max: 200, step: 10 },
+		{ type: 'dropdown', key: KEY.linkSource, displayName: 'Draw links from', default: 'all', options: { all: 'All links', body: 'Note body', frontmatter: 'Properties' } },
+		{ type: 'multitext', key: KEY.linkProperties, displayName: 'Link properties (empty = all)', default: [], shouldHide: () => config.get(KEY.linkSource) !== 'frontmatter' },
 		{
 			type: 'group',
 			displayName: 'Pro',

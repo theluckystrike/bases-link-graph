@@ -1,5 +1,6 @@
 ---
 type: meeting
+project: "[[Beacon]]"
 date: 2026-09-03
 team:
   - Research

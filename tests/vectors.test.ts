@@ -5,7 +5,7 @@ import type { Edge, GraphOptions, NodeInput } from '../src/graph';
 
 interface Case {
 	name: string;
-	function?: 'sizeScale' | 'colorScale' | 'parseNumber';
+	function?: 'sizeScale' | 'colorScale' | 'parseNumber' | 'linkCounts';
 	args: unknown[];
 	expected: unknown;
 }

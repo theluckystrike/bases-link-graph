@@ -2,7 +2,7 @@
  "slug": "bases-link-graph",
  "module": "bases-link-graph/src/graph",
  "function": "buildGraph",
- "note": "buildGraph cases: args = [rows as [{id, label, links: {path: count}, props: {propertyId: value}}], options {showOrphans, linkEdges, sharedProps, maxGroup, focus, depth}]; expected = nodes as ids in order, edges as [source, target, kind, weight, mutual] for links and [source, target, kind, weight, prop, values] for shared values, and hidden {orphans, outside} when present. Cases with a \"function\" field call that export of the same module (sizeScale, colorScale, parseNumber) with args and compare the whole result.",
+ "note": "buildGraph cases: args = [rows as [{id, label, links: {path: count}, props: {propertyId: value}}], options {showOrphans, linkEdges, sharedProps, maxGroup, focus, depth}]; expected = nodes as ids in order, edges as [source, target, kind, weight, mutual] for links and [source, target, kind, weight, prop, values] for shared values, and hidden {orphans, outside} when present. Cases with a \"function\" field call that export of the same module (sizeScale, colorScale, parseNumber) with args and compare the whole result. linkCounts counts resolved reference targets and filters property cache keys.",
  "cases": [
   {
    "name": "one link between two rows",
@@ -1518,6 +1518,201 @@
     "1,20"
    ],
    "expected": null
+  },
+  {
+   "name": "count duplicate targets and omit unresolved links",
+   "function": "linkCounts",
+   "args": [
+    [
+     {
+      "target": "a.md"
+     },
+     {
+      "target": "a.md"
+     },
+     {
+      "target": "b.md"
+     },
+     {
+      "target": null
+     },
+     {
+      "target": ""
+     }
+    ]
+   ],
+   "expected": {
+    "a.md": 2,
+    "b.md": 1
+   }
+  },
+  {
+   "name": "empty property selection keeps all property links",
+   "function": "linkCounts",
+   "args": [
+    [
+     {
+      "target": "a.md",
+      "key": "parent"
+     },
+     {
+      "target": "b.md",
+      "key": "friend"
+     }
+    ],
+    []
+   ],
+   "expected": {
+    "a.md": 1,
+    "b.md": 1
+   }
+  },
+  {
+   "name": "selected property excludes other relations",
+   "function": "linkCounts",
+   "args": [
+    [
+     {
+      "target": "a.md",
+      "key": "parent"
+     },
+     {
+      "target": "b.md",
+      "key": "friend"
+     },
+     {
+      "target": "c.md"
+     }
+    ],
+    [
+     "parent"
+    ]
+   ],
+   "expected": {
+    "a.md": 1
+   }
+  },
+  {
+   "name": "list and object keys keep their parent property",
+   "function": "linkCounts",
+   "args": [
+    [
+     {
+      "target": "a.md",
+      "key": "parent.0"
+     },
+     {
+      "target": "b.md",
+      "key": "parent,1.target"
+     },
+     {
+      "target": "c.md",
+      "key": "parentage"
+     },
+     {
+      "target": "d.md",
+      "key": "friend"
+     }
+    ],
+    [
+     "parent"
+    ]
+   ],
+   "expected": {
+    "a.md": 1,
+    "b.md": 1
+   }
+  },
+  {
+   "name": "property names accept note prefix and trim spaces",
+   "function": "linkCounts",
+   "args": [
+    [
+     {
+      "target": "a.md",
+      "key": "parent"
+     },
+     {
+      "target": "b.md",
+      "key": "friend"
+     }
+    ],
+    [
+     " note.parent ",
+     "friend"
+    ]
+   ],
+   "expected": {
+    "a.md": 1,
+    "b.md": 1
+   }
+  },
+  {
+   "name": "property names keep case",
+   "function": "linkCounts",
+   "args": [
+    [
+     {
+      "target": "a.md",
+      "key": "Parent"
+     },
+     {
+      "target": "b.md",
+      "key": "parent"
+     }
+    ],
+    [
+     "Parent"
+    ]
+   ],
+   "expected": {
+    "a.md": 1
+   }
+  },
+  {
+   "name": "missing property gives no link",
+   "function": "linkCounts",
+   "args": [
+    [
+     {
+      "target": "a.md",
+      "key": "parent"
+     }
+    ],
+    [
+     "missing"
+    ]
+   ],
+   "expected": {}
+  },
+  {
+   "name": "no cached references gives no link",
+   "function": "linkCounts",
+   "args": [
+    [],
+    [
+     "parent"
+    ]
+   ],
+   "expected": {}
+  },
+  {
+   "name": "target paths are safe object keys",
+   "function": "linkCounts",
+   "args": [
+    [
+     {
+      "target": "__proto__.md"
+     },
+     {
+      "target": "constructor.md"
+     }
+    ]
+   ],
+   "expected": {
+    "__proto__.md": 1,
+    "constructor.md": 1
+   }
   }
  ]
 }

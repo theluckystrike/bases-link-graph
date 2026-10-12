@@ -10,9 +10,17 @@ Bases Link Graph is a view for the core Bases plugin. It uses only the public Ba
 
 ### The notes of a base as a graph
 
-Every row of the base becomes one node, so the node count is the same as the result count. A link from one note in the base to another note in the base becomes an edge. Links to notes outside the base are left out. A small force layout places linked notes near each other. Notes with more links are a little larger.
+With "Show notes without links" on, every row of the base becomes one node. A link from one note in the base to another note in the base becomes an edge. Links to notes outside the base are left out. A small force layout places linked notes near each other. Notes with more links are a little larger.
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/graph.png" alt="Thirty project, person and meeting notes drawn as a graph with their links" width="720">
+
+### Choose the source of links
+
+Set "Draw links from" to "All links", "Note body" or "Properties". All links is the default. Note body includes embeds. Properties uses frontmatter links. Add names such as `parent` and `friend` to "Link properties" to select relations. An empty list uses all properties. Names are case sensitive; `note.parent` also works.
+
+The filter is free. Bases saves it with each view. Targets must be notes in the base. Pro edges from shared values use their own setting.
+
+<img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/link-source.png" alt="The team base shows only links from the project property" width="720">
 
 ### Click to open, hover to preview
 
@@ -22,7 +30,7 @@ Click a node to open its note. Ctrl-click (Cmd-click on macOS) opens it in a new
 
 ### Live update and embeds
 
-When you add or remove a link in a note of the base, the graph draws again after a short delay. The nodes keep their place, so the graph does not jump. You can embed the view in any note with `![[Your base.base#View name]]`, for example in a weekly review. The colors follow your theme.
+After a link changes, the graph draws again. Nodes keep their place. Embed a view with `![[Your base.base#View name]]`. The colors follow your theme.
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/embedded.png" alt="The graph embedded in a weekly review note" width="720">
 
@@ -46,7 +54,7 @@ Right-click a node and select "Show only notes near this one". The graph then sh
 
 ### Export and saved layouts (Pro)
 
-Export the graph to a PNG image or an SVG file with the buttons above the graph, or with the commands "Export the graph as a PNG image" and "Export the graph as an SVG image". The export shows the whole graph with every label. The SVG file also has the legend. Select "Save layout" to keep the place of each node in the base file, with this view. The graph then opens in the same shape each time. "Reset layout" removes the saved places.
+Use the buttons above the graph or the export commands to create PNG or SVG files. Exports show the whole graph with labels; SVG also includes the legend. "Save layout" keeps node positions in the base file for this view. "Reset layout" removes them.
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/export.png" alt="The exported SVG image of the graph with its legend, open in a new tab" width="720">
 
@@ -55,7 +63,7 @@ Export the graph to a PNG image or an SVG file with the buttons above the graph,
 1. Open "Settings → Community plugins", select "Browse" and search for "Bases Link Graph".
 2. Select "Install" and "Enable". The core plugin "Bases" must be on.
 
-Copy `main.js`, `manifest.json` and `styles.css` from the latest release into `<vault>/.obsidian/plugins/bases-link-graph/`. Enable the plugin. You need Obsidian 1.13.4 or later.
+For manual installation, copy the release files into `<vault>/.obsidian/plugins/bases-link-graph/` and enable the plugin. You need Obsidian 1.13.4 or later.
 
 ## Usage
 
@@ -67,11 +75,11 @@ The base limit applies: when the base shows the first 100 results, the graph has
 
 ## Pro
 
-The free version draws the notes of a base with their link edges, labels, zoom, pan, drag, click to open, hover preview, embeds and live update. It has no note limit.
+The free version draws the notes of a base with their link edges, a link-source filter, labels, zoom, pan, drag, click to open, hover preview, embeds and live update. It has no note limit.
 
 Pro adds node size and color by a property with a legend, edges from shared property values, the local depth filter, export to PNG or SVG, and saved layouts. To get it:
 
-1. Sponsor [theluckystrike on GitHub Sponsors](https://github.com/sponsors/theluckystrike) with $5 a month, or $15 once. A total payment of $15 meets the payment requirement for Pro without further payment. Sign-in and the checks below still apply.
+1. Sponsor [theluckystrike on GitHub Sponsors](https://github.com/sponsors/theluckystrike) with $5 a month, or $15 once. Read the account and network conditions below.
 2. In Obsidian, open the settings of Bases Link Graph and select "Sign in with GitHub".
 3. The plugin copies a code and opens github.com/login/device. Paste the code there and approve.
 
@@ -85,6 +93,8 @@ The view options are in the base toolbar. They are saved with each view in the b
 | --- | --- |
 | Labels | When zoomed in, always, or on hover only. |
 | Show notes without links | Shows or hides the notes that have no edge. |
+| Draw links from | All links, Note body, or Properties. |
+| Link properties | Names of link properties. Empty uses all. Applies only to Properties. |
 | Link length | The distance between linked notes, from 20 to 200. |
 | Size by (Pro) | A number property for the node size. Empty uses the number of links. |
 | Color by (Pro) | A property for the node color, with a legend. |
@@ -97,11 +107,11 @@ The plugin settings tab has the Pro section and two settings: "Animate the layou
 
 ### How is this different from the core graph view?
 
-The core graph view shows the whole vault or the local graph of one note. Bases Link Graph shows exactly the notes of a base, with the base filters. The request for this is forum topic 104414.
+The core graph shows the vault or one note and its neighbours. Bases Link Graph uses the filters of a base.
 
 ### How is this different from Graph Explorer Base View and Base Graph?
 
-Both are free graph views for Bases. Graph Explorer Base View tracks which notes you explored and their maturity in the front matter. Base Graph can add notes outside the base up to a depth, and it has ring and layered layouts and clusters. Their READMEs (read on 2026-10-10) do not offer edges from shared values or an image export. Bases Link Graph keeps to the notes of the base and adds those two.
+Graph Explorer Base View tracks exploration and maturity in frontmatter. Base Graph adds external notes, ring and layered layouts, and clusters. Bases Link Graph has shared-value edges and image export.
 
 ### How fast is it?
 

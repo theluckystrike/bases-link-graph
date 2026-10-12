@@ -1,5 +1,6 @@
 ---
 type: meeting
+project: "[[Delta]]"
 date: 2026-09-12
 team:
   - Design

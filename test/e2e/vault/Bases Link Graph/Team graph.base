@@ -18,5 +18,11 @@ views:
     graphFocus: Bases Link Graph/Notes/Atlas.md
     graphDepth: 1
     graphColorBy: note.type
+  - type: bases-link-graph
+    name: Project links
+    graphLinkSource: frontmatter
+    graphLinkProperties:
+      - project
+    graphOrphans: false
   - type: table
     name: Table

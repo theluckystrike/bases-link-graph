@@ -10,7 +10,7 @@ Bases Link Graph is a view for the core Bases plugin. It uses only the public Ba
 
 ### The notes of a base as a graph
 
-With "Show notes without links" on, every row of the base becomes one node. A link from one note in the base to another note in the base becomes an edge. Links to notes outside the base are left out. A small force layout places linked notes near each other. Notes with more links are a little larger.
+With "Show notes without links" on, each row of the base becomes one node. A link from one note in the base to another note in the base becomes an edge. Links to notes outside the base are left out. A small force layout places linked notes near each other. Notes with more links are a little larger.
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/graph.png" alt="Thirty project, person and meeting notes drawn as a graph with their links" width="720">
 
@@ -115,7 +115,7 @@ Graph Explorer Base View tracks exploration and maturity in frontmatter. Base Gr
 
 ### How fast is it?
 
-In the end-to-end test with 500 notes and 1,490 links, the graph was built in 2 ms, the layout warm-up took about 55 ms, and one frame drew in less than 2 ms, on an M3 Pro Mac.
+The end-to-end test opens a base of 500 notes with 1,490 links. The test fails if the layout warm-up takes 400 ms or more, or if one frame takes 50 ms or more on average. We have not measured it on a phone or a tablet.
 
 ### Does it change my notes?
 

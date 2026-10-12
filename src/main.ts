@@ -12,6 +12,17 @@ const PRO_TICK_MS = 6 * 60 * 60 * 1000;
 /** PNG export: pixels per layout unit, and the largest side in pixels. */
 const PNG_SCALE = 2;
 const PNG_MAX_SIDE = 8000;
+/** The largest canvas area that iOS and iPadOS draw. A larger canvas gives no PNG. */
+const PNG_MAX_AREA = 16_777_216;
+
+/** Pixels per layout unit for a PNG of w x h layout units: 2 or less, inside the side and area limits. */
+export function pngScale(w: number, h: number): number {
+	const W = Math.max(1, w);
+	const H = Math.max(1, h);
+	const k = Math.min(PNG_SCALE, PNG_MAX_SIDE / W, PNG_MAX_SIDE / H, Math.sqrt(PNG_MAX_AREA / (W * H)));
+	// Math.ceil in renderPng can add 1 pixel to each side; take that off the area limit.
+	return Math.ceil(W * k) * Math.ceil(H * k) > PNG_MAX_AREA ? k * 0.999 : k;
+}
 
 /** "2026-10-10 1857" in local time, for export file names. No moment: the directory scanner cannot type it. */
 export function fileStamp(d: Date): string {
@@ -153,7 +164,7 @@ export default class BasesLinkGraphPlugin extends Plugin {
 		const l = view.layout!;
 		const [x0, y0, x1, y1] = bounds(l);
 		const pad = 40;
-		const scale = Math.min(PNG_SCALE, PNG_MAX_SIDE / Math.max(1, x1 - x0 + 2 * pad), PNG_MAX_SIDE / Math.max(1, y1 - y0 + 2 * pad));
+		const scale = pngScale(x1 - x0 + 2 * pad, y1 - y0 + 2 * pad);
 		const canvas = createEl('canvas');
 		canvas.width = Math.ceil((x1 - x0 + 2 * pad) * scale);
 		canvas.height = Math.ceil((y1 - y0 + 2 * pad) * scale);
@@ -163,7 +174,7 @@ export default class BasesLinkGraphPlugin extends Plugin {
 		ctx.fillStyle = t.background;
 		ctx.fillRect(0, 0, canvas.width, canvas.height);
 		ctx.setTransform(scale, 0, 0, scale, (pad - x0) * scale, (pad - y0) * scale);
-		view.paint(ctx, t, 1, -1);
+		view.paint(ctx, t, 1, -1, true);
 		const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
 		if (!blob) throw new Error('PNG encoding failed');
 		return blob.arrayBuffer();
@@ -182,8 +193,14 @@ export default class BasesLinkGraphPlugin extends Plugin {
 		const base = normalizePath(`${folder.path === '/' ? '' : folder.path + '/'}${title}`);
 		let path = `${base}.${kind}`;
 		for (let n = 2; this.app.vault.getAbstractFileByPath(path) && n < 1000; n++) path = `${base} ${n}.${kind}`;
-		const file = kind === 'svg' ? await this.app.vault.create(path, toSvg(this.svgModel(view))) : await this.app.vault.createBinary(path, await this.renderPng(view));
-		new Notice(`Exported the graph of ${view.graph.nodes.length} notes to ${file.path}`);
-		return file;
+		try {
+			const file = kind === 'svg' ? await this.app.vault.create(path, toSvg(this.svgModel(view))) : await this.app.vault.createBinary(path, await this.renderPng(view));
+			new Notice(`Exported the graph of ${view.graph.nodes.length} notes to ${file.path}`);
+			return file;
+		} catch (e) {
+			console.error('Bases Link Graph: export failed', e);
+			new Notice(`Could not export the graph: ${e instanceof Error ? e.message : String(e)}`);
+			return null;
+		}
 	}
 }

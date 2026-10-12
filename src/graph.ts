@@ -247,6 +247,17 @@ export interface SizeOptions {
 	fallback?: number;
 }
 
+/** Smallest and largest number. A loop, not Math.min(...xs): a spread of 200,000 values overflows the stack. */
+function extent(xs: number[]): [number, number] {
+	let lo = Infinity;
+	let hi = -Infinity;
+	for (const x of xs) {
+		if (x < lo) lo = x;
+		if (x > hi) hi = x;
+	}
+	return [lo, hi];
+}
+
 /** Radius per row: square-root scale from the smallest to the largest number, so area follows the value. */
 export function sizeScale(values: (number | null)[], opts: SizeOptions = {}): number[] {
 	const min = opts.min ?? 4;
@@ -254,8 +265,7 @@ export function sizeScale(values: (number | null)[], opts: SizeOptions = {}): nu
 	const fallback = opts.fallback ?? min;
 	const nums = values.filter((v): v is number => v !== null && Number.isFinite(v));
 	if (nums.length === 0) return values.map(() => fallback);
-	const lo = Math.min(...nums);
-	const hi = Math.max(...nums);
+	const [lo, hi] = extent(nums);
 	const round = (x: number) => Math.round(x * 100) / 100;
 	if (hi === lo) return values.map((v) => (v === null ? fallback : round((min + max) / 2)));
 	return values.map((v) => (v === null || !Number.isFinite(v) ? fallback : round(min + (max - min) * Math.sqrt((v - lo) / (hi - lo)))));
@@ -282,7 +292,7 @@ function fmt(x: number): string {
 
 /**
  * Palette slot per row from one property.
- *   Numbers (every value a number, more distinct values than slots): `bins` equal-width ranges, slots 0..bins-1.
+ *   Numbers (every value a number, more distinct numbers than slots): `bins` equal-width ranges, slots 0..bins-1.
  *   Otherwise categories by count (ties by name); when there are more than `slots`, the rest share the last slot "Other".
  * Lists use their first value. No value = slot -1, listed last in the legend as "(no value)".
  */
@@ -298,11 +308,10 @@ export function colorScale(values: PropValue[], opts: { slots?: number; bins?: n
 	const present = first.filter((v): v is Scalar => v !== null);
 	if (present.length === 0) return { kind: 'none', slots: values.map(() => -1), legend: noneItem };
 	const nums = first.map((v) => (v === null ? null : parseNumber(v)));
-	const distinct = new Set(present.map(valueKey));
-	if (nums.every((n, i) => first[i] === null || n !== null) && distinct.size > slots) {
-		const xs = nums.filter((n): n is number => n !== null);
-		const lo = Math.min(...xs);
-		const hi = Math.max(...xs);
+	const xs = nums.filter((n): n is number => n !== null);
+	// Distinct numbers, not distinct text: "1" and "1.0" are one number, and equal numbers give a bin width of 0.
+	if (xs.length === present.length && new Set(xs).size > slots) {
+		const [lo, hi] = extent(xs);
 		const w = (hi - lo) / bins;
 		const slotOf = (n: number) => Math.min(bins - 1, Math.floor((n - lo) / w));
 		const counts = new Array<number>(bins).fill(0);

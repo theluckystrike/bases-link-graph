@@ -357,8 +357,8 @@ export class GraphView extends BasesView implements HoverParent {
 		}
 	}
 
-	/** Paints edges, nodes and labels with the current transform. Shared by the view and the PNG export. */
-	paint(ctx: CanvasRenderingContext2D, t: Theme, zoom: number, hover: number): void {
+	/** Paints edges, nodes and labels with the current transform. Shared by the view and the PNG export (allLabels true). */
+	paint(ctx: CanvasRenderingContext2D, t: Theme, zoom: number, hover: number, allLabels = false): void {
 		const l = this.layout!;
 		const g = this.graph!;
 		const near = hover >= 0 ? new Set([hover, ...(this.neighbours[hover] ?? [])]) : null;
@@ -385,15 +385,15 @@ export class GraphView extends BasesView implements HoverParent {
 			ctx.arc(l.x[i]!, l.y[i]!, this.radius[i] ?? 5, 0, Math.PI * 2);
 			ctx.fill();
 		}
-		this.paintLabels(ctx, t, zoom, near);
+		this.paintLabels(ctx, t, zoom, near, allLabels);
 		ctx.globalAlpha = 1;
 	}
 
-	private paintLabels(ctx: CanvasRenderingContext2D, t: Theme, zoom: number, near: Set<number> | null): void {
+	private paintLabels(ctx: CanvasRenderingContext2D, t: Theme, zoom: number, near: Set<number> | null, allLabels: boolean): void {
 		const l = this.layout!;
 		const g = this.graph!;
 		const mode = this.opts?.labels ?? 'auto';
-		const all = mode === 'always' || (mode === 'auto' && zoom >= 0.75);
+		const all = allLabels || mode === 'always' || (mode === 'auto' && zoom >= 0.75);
 		if (!all && !near) return;
 		const size = 12 / zoom;
 		ctx.font = `${size}px ${t.font}`;
@@ -430,6 +430,8 @@ export class GraphView extends BasesView implements HoverParent {
 		this.registerDomEvent(c, 'pointerdown', (evt) => this.onDown(evt));
 		this.registerDomEvent(c, 'pointermove', (evt) => this.onMove(evt));
 		this.registerDomEvent(c, 'pointerup', (evt) => this.onUp(evt));
+		// Touch scroll or a system gesture cancels the pointer with no pointerup. Without this the drag stays on and the layout never cools.
+		this.registerDomEvent(c, 'pointercancel', () => this.endDrag());
 		this.registerDomEvent(c, 'pointerleave', () => this.setHover(-1, null));
 		this.registerDomEvent(c, 'dblclick', (evt) => {
 			if (this.nodeAt(evt) < 0) {
@@ -476,22 +478,32 @@ export class GraphView extends BasesView implements HoverParent {
 	}
 
 	private onUp(evt: PointerEvent): void {
+		if (this.canvas.hasPointerCapture(evt.pointerId)) this.canvas.releasePointerCapture(evt.pointerId);
+		const p = this.endDrag();
+		if (p && !p.moved && p.mode === 'node') this.open(p.node, Keymap.isModEvent(evt));
+	}
+
+	/** Ends a pan or a node drag and lets the layout cool. Returns the pointer that ended. */
+	private endDrag(): Pointer | null {
 		const p = this.pointer;
 		this.pointer = null;
-		if (!p) return;
-		if (this.canvas.hasPointerCapture(evt.pointerId)) this.canvas.releasePointerCapture(evt.pointerId);
+		if (!p) return null;
 		if (p.mode === 'node' && this.layout) {
 			this.layout.alphaTarget = 0;
 			if (!p.wasFixed && this.opts?.saved === null) this.layout.fixed[p.node] = 0;
 			if (this.opts?.saved) this.layout.fixed[p.node] = 1;
 		}
-		if (!p.moved && p.mode === 'node') this.open(p.node, Keymap.isModEvent(evt));
+		return p;
 	}
 
-	/** Opens the note of node i (in a new tab with Ctrl or Cmd). */
+	/**
+	 * Opens the note of node i (in a new tab with Ctrl or Cmd). Opens the file itself, not a link to its path:
+	 * openLinkText cuts a name such as "C# guide.md" at the # and can create a new empty note.
+	 */
 	open(i: number, newTab: boolean | 'tab' | 'split' | 'window' = false): void {
 		const n = this.graph?.nodes[i];
-		if (n) void this.app.workspace.openLinkText(n.id, '', newTab);
+		const file = n ? this.app.vault.getFileByPath(n.id) : null;
+		if (file) void this.app.workspace.getLeaf(newTab).openFile(file);
 	}
 
 	private onWheel(evt: WheelEvent): void {

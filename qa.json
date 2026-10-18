@@ -95,5 +95,11 @@
 				"hold": 600
 			}
 		]
+	},
+	{
+		"feature": "trackpad",
+		"caption": "The free setting enables swipe to pan and pinch to zoom.",
+		"eval": "(async () => { const p = app.plugins.plugins['bases-link-graph']; p.pro.signOut(); p.settings.trackpad = true; app.setting.open(); app.setting.openTabById('bases-link-graph'); return 'trackpad setting on'; })()",
+		"after": "app.setting.close(); app.plugins.plugins['bases-link-graph'].settings.trackpad = false; 'ok'"
 	}
 ]

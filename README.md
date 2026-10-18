@@ -2,7 +2,7 @@
 
 Bases Link Graph draws the notes that a base selects as a graph. Each note is a node, and each link between two of those notes is an edge. Set the filters of the base, and the graph shows only those notes.
 
-Bases Link Graph is a view for the core Bases plugin. It uses only the public Bases API.
+
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/bases-link-graph.gif" alt="A base of 30 team notes drawn as a graph, then colored by type, joined by team and narrowed to the notes near one project" width="720">
 
@@ -10,7 +10,7 @@ Bases Link Graph is a view for the core Bases plugin. It uses only the public Ba
 
 ### The notes of a base as a graph
 
-With "Show notes without links" on, each row of the base becomes one node. A link from one note in the base to another note in the base becomes an edge. Links to notes outside the base are left out. A small force layout places linked notes near each other. Notes with more links are a little larger.
+With "Show notes without links" on, each row of the base becomes one node. A link from one note in the base to another note in the base becomes an edge. The graph excludes links to notes outside the base. A small force layout places linked notes near each other. Notes with more links are a little larger.
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/graph.png" alt="Thirty project, person and meeting notes drawn as a graph with their links" width="720">
 
@@ -27,6 +27,12 @@ The filter is free. Bases saves it with each view. Targets must be notes in the 
 Click a node to open its note. Ctrl-click (Cmd-click on macOS) opens it in a new tab. Hover over a node to light up its links and see a card with its name. Hold Ctrl (Cmd on macOS) while you move onto a node to see the page preview of the note. Scroll to zoom, drag the background to pan, and drag a node to move it. Double-click the background to fit the graph in the view.
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/hover.png" alt="The Atlas note hovered: its six links are highlighted and a card shows its name" width="720">
+
+### Trackpad navigation
+
+Turn on "Trackpad navigation" in the plugin settings. A two-finger scroll then pans the graph. Pinch, or hold Ctrl or Cmd while scrolling, to zoom around the pointer. Turn the setting off to use scroll-to-zoom again. The setting is free and starts off.
+
+<img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/trackpad.png" alt="The free trackpad navigation switch in the plugin settings" width="720">
 
 ### Live update and embeds
 
@@ -75,19 +81,19 @@ The base limit applies: when the base shows the first 100 results, the graph has
 
 ## Pro
 
-The free version draws the notes of a base with their link edges, a link-source filter, labels, zoom, pan, drag, click to open, hover preview, embeds and live update. It has no note limit.
+The free version draws notes and link edges. It includes link-source filters, labels, zoom, pan, drag, click to open, hover preview, embeds and live update. It has no note limit.
 
-Pro adds node size and color by a property with a legend, edges from shared property values, the local depth filter, export to PNG or SVG, and saved layouts. To get it:
+Pro adds node size and color by a property with a legend. It also adds shared-value edges, local depth, image export and saved layouts. To get it:
 
 1. Sponsor [theluckystrike on GitHub Sponsors](https://github.com/sponsors/theluckystrike) with $5 a month, or $15 once. Read the account and network conditions below.
 2. In Obsidian, open the settings of Bases Link Graph and select "Sign in with GitHub".
-3. The plugin copies a code and opens github.com/login/device. Paste the code there and approve.
+3. Paste the copied code at github.com/login/device and approve.
 
 When Pro is off, the Pro options stay saved in the base file and the graph ignores them.
 
 ## Settings
 
-The view options are in the base toolbar. They are saved with each view in the base file.
+The view options are in the base toolbar. Bases saves them with each view in the base file.
 
 | Option | What it does |
 | --- | --- |
@@ -101,17 +107,13 @@ The view options are in the base toolbar. They are saved with each view in the b
 | Join notes that share (Pro) | Property names whose shared values add dashed edges. |
 | Local depth (Pro) | How many edges away from the chosen note to show, 0 to 5. |
 
-The plugin settings tab has the Pro section and two settings: "Animate the layout" (on by default) and "Live update delay" (100 to 2000 ms, default 400).
+The plugin settings tab has the Pro section and three settings. "Animate the layout" starts on. "Trackpad navigation" starts off. "Live update delay" accepts 100 to 2000 ms and starts at 400 ms.
 
 ## FAQ
 
 ### How is this different from the core graph view?
 
 The core graph shows the vault or one note and its neighbours. Bases Link Graph uses the filters of a base.
-
-### How is this different from Graph Explorer Base View and Base Graph?
-
-Graph Explorer Base View tracks exploration and maturity in frontmatter. Base Graph adds external notes, ring and layered layouts, and clusters. Bases Link Graph has shared-value edges and image export.
 
 ### How fast is it?
 

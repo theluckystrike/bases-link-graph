@@ -1,4 +1,4 @@
-import { BasesView, Keymap, Menu, Notice, parseLinktext, setIcon, type BasesAllOptions, type BasesPropertyId, type BasesViewConfig, type HoverParent, type HoverPopover, type MetadataCache, type QueryController, type TFile } from 'obsidian';
+import { BasesView, BooleanValue, NumberValue, StringValue, Keymap, Menu, Notice, parseLinktext, setIcon, type BasesAllOptions, type BasesPropertyId, type BasesViewConfig, type HoverParent, type HoverPopover, type MetadataCache, type QueryController, type TFile } from 'obsidian';
 import { buildGraph, colorScale, linkCounts, parseNumber, sizeScale, type ColorResult, type Graph, type LinkSource, type NodeInput, type PropValue } from './graph';
 import { bounds, createLayout, hitTest, reheat, run, tick, type LayoutState } from './layout';
 import { isPro, onProChange } from './pro';
@@ -60,13 +60,19 @@ export function toPropertyId(name: string): BasesPropertyId | null {
 /** Converts a Bases value to plain data: lists stay lists, empty values become null. */
 export function toPlain(v: unknown): PropValue {
 	if (v === null || v === undefined) return null;
+	if (v instanceof BooleanValue) return v.isTruthy();
+	if (v instanceof NumberValue) {
+		const n = Number(v.toString());
+		return Number.isFinite(n) ? n : null;
+	}
+	if (v instanceof StringValue) return v.toString() || null;
 	const val = v as { toString(): string; isTruthy?(): boolean; length?: unknown; get?: unknown };
 	if (typeof val.length === 'function' && typeof val.get === 'function') {
 		const list = val as unknown as { length(): number; get(i: number): unknown };
-		const out: string[] = [];
+		const out: (string | number | boolean)[] = [];
 		for (let i = 0; i < list.length(); i++) {
 			const item = toPlain(list.get(i));
-			if (item !== null && !Array.isArray(item)) out.push(String(item));
+			if (item !== null && !Array.isArray(item)) out.push(item);
 		}
 		return out;
 	}
@@ -508,10 +514,24 @@ export class GraphView extends BasesView implements HoverParent {
 
 	private onWheel(evt: WheelEvent): void {
 		evt.preventDefault();
+		// A legend or toolbar can change the stage height after its first draw.
+		// Resize before the gesture, so draw() does not fit away its pan or zoom.
+		const ratio = window.devicePixelRatio || 1;
+		if (this.canvas.width !== Math.round(this.canvas.clientWidth * ratio) || this.canvas.height !== Math.round(this.canvas.clientHeight * ratio)) this.resize();
+		// Pixel scroll is a two-finger swipe on a trackpad. Ctrl-wheel is the
+		// browser's pinch signal. The setting keeps mouse-wheel zoom as the default.
+		if (this.plugin.settings.trackpad && !evt.ctrlKey && !evt.metaKey) {
+			const unit = evt.deltaMode === 1 ? 16 : evt.deltaMode === 2 ? Math.max(1, this.canvas.clientHeight) : 1;
+			this.tx -= evt.deltaX * unit;
+			this.ty -= evt.deltaY * unit;
+			this.draw();
+			return;
+		}
 		const rect = this.canvas.getBoundingClientRect();
 		const mx = evt.clientX - rect.left;
 		const my = evt.clientY - rect.top;
-		const k = Math.max(0.05, Math.min(8, this.zoom * Math.exp(-evt.deltaY * 0.0015)));
+		const factor = this.plugin.settings.trackpad ? 0.01 : 0.0015;
+		const k = Math.max(0.05, Math.min(8, this.zoom * Math.exp(-evt.deltaY * factor)));
 		this.tx = mx - ((mx - this.tx) * k) / this.zoom;
 		this.ty = my - ((my - this.ty) * k) / this.zoom;
 		this.zoom = k;

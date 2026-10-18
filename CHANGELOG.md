@@ -1,5 +1,11 @@
 # bases-link-graph
 
+## 1.2.0
+
+### Minor Changes
+
+- eb13a8b: Add optional trackpad pan and pinch controls. Keep checkbox values typed when the graph reads mixed properties. Resize the canvas before a wheel gesture so the first pan or zoom stays in place.
+
 ## 1.1.2
 
 ### Patch Changes

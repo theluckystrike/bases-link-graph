@@ -40,7 +40,7 @@ describe('settings', () => {
 		expect(normalizeSettings(null)).toEqual(DEFAULT_SETTINGS);
 		expect(normalizeSettings({ debounceMs: 5 }).debounceMs).toBe(100);
 		expect(normalizeSettings({ debounceMs: 99999 }).debounceMs).toBe(2000);
-		expect(normalizeSettings({ debounceMs: 450.4, animate: false })).toEqual({ debounceMs: 450, animate: false });
+		expect(normalizeSettings({ debounceMs: 450.4, animate: false })).toEqual({ debounceMs: 450, animate: false, trackpad: false });
 	});
 });
 

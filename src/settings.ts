@@ -8,6 +8,8 @@ export interface BasesLinkGraphSettings {
 	debounceMs: number;
 	/** Animate the layout as it settles. Off = settle first, then draw once. */
 	animate: boolean;
+	/** Pan with two-finger scrolling; pinch or Ctrl/Cmd-scroll to zoom. */
+	trackpad: boolean;
 }
 
 export const DEBOUNCE_MIN = 100;
@@ -16,6 +18,7 @@ export const DEBOUNCE_MAX = 2000;
 export const DEFAULT_SETTINGS: BasesLinkGraphSettings = {
 	debounceMs: 400,
 	animate: true,
+	trackpad: false,
 };
 
 /** Fills gaps and drops bad values from saved data, so old or hand-edited data.json never breaks the plugin. */
@@ -25,6 +28,7 @@ export function normalizeSettings(saved: Partial<BasesLinkGraphSettings> | null 
 	return {
 		debounceMs: Math.min(DEBOUNCE_MAX, Math.max(DEBOUNCE_MIN, d)),
 		animate: typeof s.animate === 'boolean' ? s.animate : DEFAULT_SETTINGS.animate,
+		trackpad: typeof s.trackpad === 'boolean' ? s.trackpad : DEFAULT_SETTINGS.trackpad,
 	};
 }
 
@@ -43,6 +47,11 @@ export class BasesLinkGraphSettingTab extends PluginSettingTab {
 				name: 'Animate the layout',
 				desc: 'Show the nodes as they move into place. Turn off to draw the finished layout at once.',
 				control: { type: 'toggle', key: 'animate', defaultValue: DEFAULT_SETTINGS.animate },
+			},
+			{
+				name: 'Trackpad navigation',
+				desc: 'Pan with two-finger scrolling. Pinch, or hold Ctrl or Cmd while scrolling, to zoom. Off keeps scroll-to-zoom.',
+				control: { type: 'toggle', key: 'trackpad', defaultValue: DEFAULT_SETTINGS.trackpad },
 			},
 			{
 				name: 'Live update delay',

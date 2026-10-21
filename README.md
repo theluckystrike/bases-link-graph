@@ -6,6 +6,8 @@ Bases Link Graph draws the notes that a base selects as a graph. Each note is a 
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/bases-link-graph.gif" alt="A base of 30 team notes drawn as a graph, then colored by type, joined by team and narrowed to the notes near one project" width="720">
 
+Free: filtered notes, links, navigation, previews, embeds, live updates. Pro: property styling, shared-value edges, local depth, exports, saved layouts. $15 one time or $5 a month: [Sponsor](https://github.com/sponsors/theluckystrike?metadata_source=bases-link-graph) or [$15 one-time offer](https://github.com/sponsors/theluckystrike/sponsorships?tier_id=666162&metadata_source=bases-link-graph).
+
 ## Features
 
 ### The notes of a base as a graph
@@ -85,7 +87,7 @@ The free version draws notes and link edges. It includes link-source filters, la
 
 Pro adds node size and color by a property with a legend. It also adds shared-value edges, local depth, image export and saved layouts. To get it:
 
-1. Sponsor [theluckystrike on GitHub Sponsors](https://github.com/sponsors/theluckystrike) with $5 a month, or $15 once. Read the account and network conditions below.
+1. Sponsor through [GitHub Sponsors](https://github.com/sponsors/theluckystrike?metadata_source=bases-link-graph). A total payment of $15 meets the payment requirement for Pro without further payment. Sign-in and the checks below still apply. Read the account and network conditions below.
 2. In Obsidian, open the settings of Bases Link Graph and select "Sign in with GitHub".
 3. Paste the copied code at github.com/login/device and approve.
 
@@ -136,6 +138,8 @@ After sign in, Bases Link Graph sends one query to `https://api.github.com/graph
 After a successful check, Pro can work offline for up to 14 days. Sign out or a negative sponsorship answer turns Pro off. The plugin stores the GitHub token through the secret storage API of Obsidian. It does not put the token in its saved settings or its local sponsorship data. The local storage of this device keeps your GitHub login, the tier and the time of the last check. Sign out clears the token. You can also revoke the access in your GitHub settings, under Applications.
 
 ## Support
+
+Plugin page: [bases-link-graph](https://notemods.com/plugins/bases-link-graph/).
 
 Report bugs and feature requests in this repository's issues. Add your Obsidian version and, if possible, a small sample base.
 

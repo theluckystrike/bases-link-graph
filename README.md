@@ -1,6 +1,6 @@
 # Bases Link Graph
 
-Bases Link Graph draws the notes that a base selects as a graph. Each note is a node, and each link between two of those notes is an edge. Set the filters of the base, and the graph shows only those notes.
+Bases Link Graph draws the notes that a base selects as a graph. Each note is a node, and each link between two of those notes is an edge.
 
 
 
@@ -12,7 +12,7 @@ Free: filtered notes, links, navigation, previews, embeds, live updates. Pro: pr
 
 ### The notes of a base as a graph
 
-With "Show notes without links" on, each row of the base becomes one node. A link from one note in the base to another note in the base becomes an edge. The graph excludes links to notes outside the base. A small force layout places linked notes near each other. Notes with more links are a little larger.
+With "Show notes without links" on, each row of the base becomes one node. The graph excludes links to notes outside the base. A small force layout places linked notes near each other. Notes with more links are a little larger.
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/graph.png" alt="Thirty project, person and meeting notes drawn as a graph with their links" width="720">
 
@@ -20,19 +20,19 @@ With "Show notes without links" on, each row of the base becomes one node. A lin
 
 Set "Draw links from" to "All links", "Note body" or "Properties". All links is the default. Note body includes embeds. Properties uses frontmatter links. Add names such as `parent` and `friend` to "Link properties" to select relations. An empty list uses all properties. Names are case sensitive; `note.parent` also works.
 
-The filter is free. Bases saves it with each view. Targets must be notes in the base. Pro edges from shared values use their own setting.
+The filter is free. Bases saves it with each view. Pro edges from shared values use their own setting.
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/link-source.png" alt="The team base shows only links from the project property" width="720">
 
 ### Click to open, hover to preview
 
-Click a node to open its note. Ctrl-click (Cmd-click on macOS) opens it in a new tab. Hover over a node to light up its links and see a card with its name. Hold Ctrl (Cmd on macOS) while you move onto a node to see the page preview of the note. Scroll to zoom, drag the background to pan, and drag a node to move it. Double-click the background to fit the graph in the view.
+Click a node to open its note. Ctrl-click (Cmd-click on macOS) opens it in a new tab. Hover over a node to light up its links and see a card with its name. Hold Ctrl (Cmd on macOS) while you move onto a node to preview the note. Scroll to zoom, drag the background to pan, and drag a node to move it. Double-click the background to fit the graph in the view.
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/hover.png" alt="The Atlas note hovered: its six links are highlighted and a card shows its name" width="720">
 
 ### Trackpad navigation
 
-Turn on "Trackpad navigation" in the plugin settings. A two-finger scroll then pans the graph. Pinch, or hold Ctrl or Cmd while scrolling, to zoom around the pointer. Turn the setting off to use scroll-to-zoom again. The setting is free and starts off.
+Turn on "Trackpad navigation" in the plugin settings. A two-finger scroll then pans the graph. Pinch, or hold Ctrl or Cmd while scrolling, to zoom around the pointer. Turn the setting off to use scroll-to-zoom again. The setting is free.
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/trackpad.png" alt="The free trackpad navigation switch in the plugin settings" width="720">
 
@@ -75,7 +75,7 @@ For manual installation, copy the release files into `<vault>/.obsidian/plugins/
 
 ## Usage
 
-1. Create a base, or open one. Set its filters so that it selects the notes that you want to see.
+1. Create a base, or open one. Set its filters to select the notes you want to see.
 2. Select the view menu in the base toolbar and add a view of the type "Link graph".
 3. Open the view options to choose labels, the link length and, with Pro, size, color, shared values and depth.
 
@@ -83,11 +83,9 @@ The base limit applies: when the base shows the first 100 results, the graph has
 
 ## Pro
 
-The free version draws notes and link edges. It includes link-source filters, labels, zoom, pan, drag, click to open, hover preview, embeds and live update. It has no note limit.
+The free version has no note limit. Pro adds the features marked (Pro) above. To get it:
 
-Pro adds node size and color by a property with a legend. It also adds shared-value edges, local depth, image export and saved layouts. To get it:
-
-1. Sponsor through [GitHub Sponsors](https://github.com/sponsors/theluckystrike?metadata_source=bases-link-graph). A total payment of $15 meets the payment requirement for Pro without further payment. Sign-in and the checks below still apply. Read the account and network conditions below.
+1. Sponsor through [GitHub Sponsors](https://github.com/sponsors/theluckystrike?metadata_source=bases-link-graph). A total payment of $15 meets the payment requirement for Pro without further payment. Sign-in and the checks below still apply.
 2. In Obsidian, open the settings of Bases Link Graph and select "Sign in with GitHub".
 3. Paste the copied code at github.com/login/device and approve.
 
@@ -95,7 +93,9 @@ When Pro is off, the Pro options stay saved in the base file and the graph ignor
 
 ## Settings
 
-The view options are in the base toolbar. Bases saves them with each view in the base file.
+After a minor or major update, this plugin opens one What's new tab in the background. The tab and settings card suggest other NoteMods plugins and Zovo Chat and link to notemods.com for feedback ([privacy](https://notemods.com/privacy/)). The tab sends no data. Turn the tab off in Settings.
+
+The view options are in the base toolbar, saved with each view in the base file.
 
 | Option | What it does |
 | --- | --- |
@@ -141,7 +141,7 @@ After a successful check, Pro can work offline for up to 14 days. Sign out or a 
 
 Plugin page: [bases-link-graph](https://notemods.com/plugins/bases-link-graph/).
 
-Report bugs and feature requests in this repository's issues. Add your Obsidian version and, if possible, a small sample base.
+Report bugs and feature requests in the issues, with your Obsidian version and, if possible, a small sample base.
 
 ## Community
 

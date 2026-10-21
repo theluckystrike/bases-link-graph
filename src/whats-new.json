@@ -1,0 +1,34 @@
+{
+	"id": "bases-link-graph",
+	"name": "Bases Link Graph",
+	"version": "1.3.0",
+	"changes": [
+		"New Send feedback command. It opens a page where you can report a problem or suggest an idea.",
+		"Adds optional trackpad pan and pinch controls.",
+		"Keeps checkbox values typed when the graph reads mixed properties."
+	],
+	"changes_user": [
+		"New Send feedback command. It opens a page where you can report a problem or suggest an idea.",
+		"You can now pan and zoom the graph with trackpad gestures.",
+		"Checkbox values keep their type when the graph reads mixed properties."
+	],
+	"tip": "Right-click a node and choose Show only notes near this one to limit depth with Pro.",
+	"thanks": "Hi, I am Michael, a solo developer in Poland. Bases Link Graph is one of over 100 small plugins that I make. Thank you for using it with Bases. Bases is still new, and your setups teach me a lot.",
+	"related": [
+		{
+			"id": "bases-filter-switches",
+			"name": "Bases Filter Switches",
+			"blurb": "Turn saved Bases filters on or off with switches."
+		},
+		{
+			"id": "bases-freeze-panes",
+			"name": "Bases Freeze Panes",
+			"blurb": "Keep column and note names visible as you scroll a base."
+		},
+		{
+			"id": "pdf-cover-cards",
+			"name": "PDF Cover Cards",
+			"blurb": "Show the first PDF page as a cover in your base."
+		}
+	]
+}

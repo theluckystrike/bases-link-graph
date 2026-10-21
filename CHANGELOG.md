@@ -1,5 +1,11 @@
 # bases-link-graph
 
+## 1.3.0
+
+### Minor Changes
+
+- After a minor or major update, Bases Link Graph opens one What's new tab in the background. It links to notemods.com, where you can send feedback. Turn it off in Settings. Add the Send feedback command. The plugin makes no new network requests.
+
 ## 1.2.1
 
 ### Patch Changes

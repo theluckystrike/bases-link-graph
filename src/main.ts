@@ -1,7 +1,7 @@
 import { Notice, Plugin, normalizePath, type TFile } from 'obsidian';
 import type { SponsorsManager } from './license/index';
 import { createGitHubSponsors } from './license/github-obsidian';
-import { toSvg, type SvgModel } from './graph';
+import { arrowEnds, relationNames, toSvg, type SvgModel } from './graph';
 import { bounds } from './layout';
 import { SPONSORS, bindPro, isPro, resetPro } from './pro';
 import { DEFAULT_SETTINGS, BasesLinkGraphSettingTab, normalizeSettings, type BasesLinkGraphSettings } from './settings';
@@ -158,8 +158,17 @@ export default class BasesLinkGraphPlugin extends Plugin {
 			background: t.background,
 			text: t.text,
 			nodes: g.nodes.map((n, i) => ({ x: l.x[i]!, y: l.y[i]!, r: view.radius[i] ?? 5, color: view.nodeColor(i, t), label: n.label })),
-			edges: g.edges.map((e) => ({ source: e.source, target: e.target, dashed: e.kind === 'shared', color: e.kind === 'shared' ? t.shared : t.line, width: Math.min(3, 1 + Math.log2(e.weight)) })),
+			edges: g.edges.map((e, k) => ({
+				source: e.source,
+				target: e.target,
+				dashed: e.kind === 'shared',
+				color: view.edgeColor(k, t),
+				width: Math.min(3, 1 + Math.log2(e.weight)),
+				arrows: view.opts?.arrows ? arrowEnds(e) : [],
+				relations: relationNames(e),
+			})),
 			legend: view.legendColors(),
+			linkLegend: view.linkLegendColors(),
 		};
 	}
 

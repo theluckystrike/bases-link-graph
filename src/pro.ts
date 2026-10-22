@@ -15,7 +15,7 @@ export const SPONSORS: SponsorsConfig = {
 };
 
 export const PRO_UI = {
-	proSummary: 'Pro adds node size and color by a property with a legend, edges from shared property values, a local depth filter, export to PNG or SVG, and saved layouts.',
+	proSummary: 'Pro adds node size and color by a property with a legend, link colors by relation, edges from shared property values, a local depth filter, export to PNG or SVG, and saved layouts.',
 	priceText: 'Sponsor $5 a month, or $15 once. When you have paid $15 in total, Pro stays on.',
 };
 

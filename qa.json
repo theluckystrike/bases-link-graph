@@ -14,6 +14,21 @@
 		"wait": 800
 	},
 	{
+		"feature": "link-types",
+		"caption": "Pro: a family base with arrows, a color for each relation and the Links legend.",
+		"note": "Family tree.base",
+		"eval": "(async () => { app.plugins.plugins['bases-link-graph'].pro.opts.http = async () => ({ status: 200, json: { data: { viewer: { login: 'demo-reader' }, user: { sponsorshipForViewerAsSponsor: { isActive: true, isOneTimePayment: false, tier: { name: '$5 a month', monthlyPriceInCents: 500 } } } } } }); app.secretStorage.setSecret('bases-link-graph-github-token', 'gho_' + '0'.repeat(36)); await app.plugins.plugins['bases-link-graph'].pro.refreshNow(); await app.workspace.openLinkText('Bases Link Graph/Family tree.base#Relations', '', false); await new Promise((r) => setTimeout(r, 1800)); const v = [...app.plugins.plugins['bases-link-graph'].views].filter((v) => v.containerEl.isConnected && v.containerEl.offsetParent !== null && v.graph).pop(); if (!v || v.graph.nodes.length !== 6 || v.graph.edges.length !== 7 || !v.opts.arrows) throw new Error('Wrong family graph'); const positions = { Rose: [200, 0], Tom: [70, 140], Mia: [330, 140], Leo: [0, 290], Zoe: [150, 340], Sam: [360, 290] }; v.graph.nodes.forEach((n, i) => { const p = positions[n.label]; v.layout.x[i] = p[0]; v.layout.y[i] = p[1]; }); v.layout.alpha = 0; v.layout.alphaTarget = 0; v.fit(); v.draw(); if (!v.linkColor || v.linkColor.legend.length !== 2) throw new Error('No link colors'); return '6 notes, 7 links, parent and friend colors'; })()",
+		"wait": 800,
+		"after": "(async () => { app.plugins.plugins['bases-link-graph'].pro.signOut(); return 'ok'; })()"
+	},
+	{
+		"feature": "link-hover",
+		"caption": "Free: arrows show the direction of each link, and the hover card lists the relations of Tom.",
+		"note": "Family tree.base",
+		"eval": "(async () => { app.plugins.plugins['bases-link-graph'].pro.signOut(); await app.workspace.openLinkText('Bases Link Graph/Family tree.base#Relations', '', false); await new Promise((r) => setTimeout(r, 1800)); const v = [...app.plugins.plugins['bases-link-graph'].views].filter((v) => v.containerEl.isConnected && v.containerEl.offsetParent !== null && v.graph).pop(); if (!v || v.graph.nodes.length !== 6 || v.graph.edges.length !== 7 || !v.opts.arrows) throw new Error('Wrong family graph'); const positions = { Rose: [200, 0], Tom: [70, 140], Mia: [330, 140], Leo: [0, 290], Zoe: [150, 340], Sam: [360, 290] }; v.graph.nodes.forEach((n, i) => { const p = positions[n.label]; v.layout.x[i] = p[0]; v.layout.y[i] = p[1]; }); v.layout.alpha = 0; v.layout.alphaTarget = 0; v.fit(); v.draw(); const p = v.screenPos('Bases Link Graph/Family/Tom.md'); const c = v.containerEl.querySelector('canvas'); const r = c.getBoundingClientRect(); c.dispatchEvent(new PointerEvent('pointermove', { clientX: r.left + p.x, clientY: r.top + p.y, bubbles: true })); await new Promise((r) => setTimeout(r, 300)); if (!v.containerEl.querySelector('.bases-link-graph-tip-relation')) throw new Error('No relation lines'); return 'hover Tom'; })()",
+		"wait": 500
+	},
+	{
 		"feature": "hover",
 		"caption": "Hover a note to light up its links and see its name. Click it to open the note.",
 		"note": "Team graph.base",

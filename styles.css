@@ -97,6 +97,16 @@
 	flex: none;
 }
 
+.bases-link-graph-swatch.is-line {
+	width: 14px;
+	height: 3px;
+	border-radius: 2px;
+}
+
+.bases-link-graph-legend-title.bases-link-graph-legend-links:not(:first-child) {
+	margin-top: var(--size-4-2);
+}
+
 .bases-link-graph-tip {
 	display: none;
 	position: absolute;
@@ -118,6 +128,10 @@
 .bases-link-graph-tip-title {
 	color: var(--text-normal);
 	font-weight: var(--font-semibold);
+}
+
+.bases-link-graph-tip-relation {
+	color: var(--text-normal);
 }
 
 /* NoteMods What's new tab and settings card */

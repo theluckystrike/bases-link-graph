@@ -1,6 +1,6 @@
 {
 	"name": "bases-link-graph",
-	"version": "1.3.0",
+	"version": "1.4.0",
 	"private": true,
 	"description": "Draws the notes that a base selects as an interactive graph. Links become edges, and you click a node to open its note.",
 	"main": "main.js",

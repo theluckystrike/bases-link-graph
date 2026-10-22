@@ -27,12 +27,51 @@ export function linkCounts(refs: ResolvedReference[], properties: string[] = [])
 	return Object.fromEntries(counts);
 }
 
+/** Relation name for body links and embeds, which have no property key. */
+export const BODY_RELATION = 'body';
+
+/** The property name of a cache key: "parent.0", "parent,1" and "parent" all give "parent". */
+export function relationName(key: string | undefined): string {
+	if (key === undefined) return BODY_RELATION;
+	return key.replace(/([.,]\d+)+$/, '');
+}
+
+/** Code-unit order, so the result does not depend on the locale. */
+function byText(a: string, b: string): number {
+	return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/**
+ * Relation names for each resolved target, sorted. Applies the same property filter as `linkCounts`.
+ * A property link is named by its property, a body link or embed is "body". Unresolved targets are skipped.
+ */
+export function linkRelations(refs: ResolvedReference[], properties: string[] = []): Record<string, string[]> {
+	const names = properties.map((p) => p.trim().replace(/^note\./, '')).filter(Boolean);
+	const out = new Map<string, Set<string>>();
+	for (const ref of refs) {
+		if (!ref.target) continue;
+		if (names.length > 0 && !names.some((p) => ref.key === p || ref.key?.startsWith(`${p}.`) || ref.key?.startsWith(`${p},`))) continue;
+		const set = out.get(ref.target) ?? new Set<string>();
+		set.add(relationName(ref.key));
+		out.set(ref.target, set);
+	}
+	return Object.fromEntries([...out].map(([target, set]) => [target, [...set].sort(byText)]));
+}
+
 /** One row of the base. `links` = resolved link targets (vault paths) with the number of links to each. */
 export interface NodeInput {
 	id: string;
 	label: string;
 	links: Record<string, number>;
 	props?: Record<string, PropValue>;
+	/** Target path -> relation names of the links to it (see `linkRelations`). Optional. */
+	relations?: Record<string, string[]>;
+}
+
+/** One relation of a link edge: its name and the row index of the note that links. */
+export interface Relation {
+	name: string;
+	from: number;
 }
 
 export interface GraphOptions {
@@ -65,6 +104,8 @@ export interface Edge {
 	weight: number;
 	/** Link edges: true when both notes link to each other. */
 	mutual?: boolean;
+	/** Link edges, only when a row has `relations`: sorted by name, then by the row that links. */
+	relations?: Relation[];
 	/** Shared edges: the property and the shared values (display form, sorted). */
 	prop?: string;
 	values?: string[];
@@ -105,20 +146,43 @@ function pairKey(a: number, b: number): string {
 /** Link edges between rows of the base: one edge per pair, weight = links both ways, mutual when both link. */
 function linkEdges(rows: NodeInput[], index: Map<string, number>): Edge[] {
 	const byPair = new Map<string, Edge>();
+	const named = rows.some((r) => r.relations !== undefined);
 	rows.forEach((row, i) => {
 		for (const [target, count] of Object.entries(row.links)) {
 			const j = index.get(target);
 			if (j === undefined || j === i || !(count > 0)) continue;
 			const key = pairKey(i, j);
-			const e = byPair.get(key);
-			if (!e) byPair.set(key, { source: i, target: j, kind: 'link', weight: count, mutual: false });
-			else {
+			let e = byPair.get(key);
+			if (!e) {
+				e = { source: i, target: j, kind: 'link', weight: count, mutual: false };
+				if (named) e.relations = [];
+				byPair.set(key, e);
+			} else {
 				e.weight += count;
 				if (e.source === j) e.mutual = true;
 			}
+			for (const name of row.relations?.[target] ?? []) e.relations?.push({ name, from: i });
 		}
 	});
-	return [...byPair.values()];
+	const edges = [...byPair.values()];
+	for (const e of edges) e.relations?.sort((a, b) => byText(a.name, b.name) || a.from - b.from);
+	return edges;
+}
+
+/** Ends of an edge that get an arrowhead: the target of a link, both ends of a mutual link, none for shared values. */
+export function arrowEnds(e: Edge): ('source' | 'target')[] {
+	if (e.kind !== 'link') return [];
+	return e.mutual ? ['source', 'target'] : ['target'];
+}
+
+/** The relation that colors a link edge: the first in name order, or null. */
+export function edgeRelation(e: Edge): string | null {
+	return e.relations?.[0]?.name ?? null;
+}
+
+/** Relation names of a link edge without repeats, in name order. */
+export function relationNames(e: Edge): string[] {
+	return [...new Set((e.relations ?? []).map((r) => r.name))];
 }
 
 /** Pro: edges between rows that share a value of one of `props`. One edge per pair and property. */
@@ -296,7 +360,7 @@ function fmt(x: number): string {
  *   Otherwise categories by count (ties by name); when there are more than `slots`, the rest share the last slot "Other".
  * Lists use their first value. No value = slot -1, listed last in the legend as "(no value)".
  */
-export function colorScale(values: PropValue[], opts: { slots?: number; bins?: number } = {}): ColorResult {
+export function colorScale(values: PropValue[], opts: { slots?: number; bins?: number; categories?: boolean } = {}): ColorResult {
 	const slots = Math.max(2, opts.slots ?? 8);
 	const bins = Math.max(2, Math.min(slots, opts.bins ?? 5));
 	const first = values.map((v) => {
@@ -310,7 +374,7 @@ export function colorScale(values: PropValue[], opts: { slots?: number; bins?: n
 	const nums = first.map((v) => (v === null ? null : parseNumber(v)));
 	const xs = nums.filter((n): n is number => n !== null);
 	// Distinct numbers, not distinct text: "1" and "1.0" are one number, and equal numbers give a bin width of 0.
-	if (xs.length === present.length && new Set(xs).size > slots) {
+	if (!opts.categories && xs.length === present.length && new Set(xs).size > slots) {
 		const [lo, hi] = extent(xs);
 		const w = (hi - lo) / bins;
 		const slotOf = (n: number) => Math.min(bins - 1, Math.floor((n - lo) / w));
@@ -338,6 +402,42 @@ export function colorScale(values: PropValue[], opts: { slots?: number; bins?: n
 	return { kind: 'category', slots: out, legend: [...legend, ...noneItem] };
 }
 
+/**
+ * Pro: color slot per edge from its first relation (always categories; more than `slots` names share "Other").
+ * Shared edges and link edges without a relation get slot -1. The legend counts link edges and leaves out "(no value)".
+ */
+export function relationColors(edges: Edge[], slots = 8): ColorResult {
+	const link = edges.map((e) => (e.kind === 'link' ? edgeRelation(e) : null));
+	const c = colorScale(link, { slots, categories: true });
+	return { ...c, legend: c.legend.filter((item) => item.slot >= 0) };
+}
+
+/**
+ * Arrowhead at the `to` end of a line from (ax, ay) to (bx, by): the tip touches the circle of radius `r` around b.
+ * Returns the tip and the two back corners, or null when the line is too short to show one.
+ */
+export function arrowHead(ax: number, ay: number, bx: number, by: number, r: number, size: number): [number, number][] | null {
+	const dx = bx - ax;
+	const dy = by - ay;
+	const d = Math.hypot(dx, dy);
+	if (!(d > r + size)) return null;
+	const ux = dx / d;
+	const uy = dy / d;
+	const tx = bx - ux * r;
+	const ty = by - uy * r;
+	const half = size * 0.5;
+	return [
+		[tx, ty],
+		[tx - ux * size - uy * half, ty - uy * size + ux * half],
+		[tx - ux * size + uy * half, ty - uy * size - ux * half],
+	];
+}
+
+/** Arrowhead length for a line of this width factor, in the units of the line. */
+export function arrowSize(width: number): number {
+	return 8 + 2 * width;
+}
+
 /** Escapes text for XML content and attribute values. */
 export function xmlEscape(s: string): string {
 	return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
@@ -357,6 +457,10 @@ export interface SvgEdge {
 	dashed?: boolean;
 	color: string;
 	width: number;
+	/** Ends that get an arrowhead (see `arrowEnds`). */
+	arrows?: ('source' | 'target')[];
+	/** Relation names of a link edge, shown as the line's title. */
+	relations?: string[];
 }
 
 export interface SvgModel {
@@ -368,6 +472,8 @@ export interface SvgModel {
 	padding?: number;
 	fontSize?: number;
 	legend?: { label: string; color: string }[];
+	/** Pro: the "Links" part of the legend, one line swatch per relation. */
+	linkLegend?: { label: string; color: string }[];
 }
 
 const r1 = (x: number) => String(Math.round(x * 10) / 10);
@@ -392,7 +498,10 @@ export function toSvg(m: SvgModel): string {
 		x1 = y1 = 100;
 	}
 	const legend = m.legend ?? [];
-	const legendH = legend.length * (fs + 6);
+	const linkLegend = m.linkLegend ?? [];
+	// The "Links" part has a title row, then one row per relation.
+	const linkRows = linkLegend.length > 0 ? linkLegend.length + 1 : 0;
+	const legendH = (legend.length + linkRows) * (fs + 6);
 	const w = x1 - x0 + 2 * pad;
 	const h = y1 - y0 + 2 * pad + (legendH > 0 ? legendH + pad / 2 : 0);
 	const ox = pad - x0;
@@ -406,7 +515,13 @@ export function toSvg(m: SvgModel): string {
 		const b = m.nodes[e.target];
 		if (!a || !b) continue;
 		const dash = e.dashed ? ' stroke-dasharray="4 3"' : '';
-		out.push(`<line x1="${r1(a.x + ox)}" y1="${r1(a.y + oy)}" x2="${r1(b.x + ox)}" y2="${r1(b.y + oy)}" stroke="${xmlEscape(e.color)}" stroke-width="${r1(e.width)}"${dash}/>`);
+		const line = `<line x1="${r1(a.x + ox)}" y1="${r1(a.y + oy)}" x2="${r1(b.x + ox)}" y2="${r1(b.y + oy)}" stroke="${xmlEscape(e.color)}" stroke-width="${r1(e.width)}"${dash}`;
+		out.push(e.relations && e.relations.length > 0 ? `${line}><title>${xmlEscape(e.relations.join(', '))}</title></line>` : `${line}/>`);
+		for (const end of e.arrows ?? []) {
+			const [from, to] = end === 'target' ? [a, b] : [b, a];
+			const head = arrowHead(from.x + ox, from.y + oy, to.x + ox, to.y + oy, to.r, arrowSize(e.width));
+			if (head) out.push(`<polygon class="arrow" points="${head.map(([x, y]) => `${r1(x)},${r1(y)}`).join(' ')}" fill="${xmlEscape(e.color)}"/>`);
+		}
 	}
 	out.push('</g>', '<g class="nodes">');
 	for (const n of m.nodes) out.push(`<circle cx="${r1(n.x + ox)}" cy="${r1(n.y + oy)}" r="${r1(n.r)}" fill="${xmlEscape(n.color)}"><title>${xmlEscape(n.label)}</title></circle>`);
@@ -418,6 +533,16 @@ export function toSvg(m: SvgModel): string {
 		legend.forEach((item, i) => {
 			const y = h - pad / 2 - legendH + i * (fs + 6) + fs / 2;
 			out.push(`<circle cx="${r1(pad)}" cy="${r1(y)}" r="${r1(fs / 2.4)}" fill="${xmlEscape(item.color)}"/><text x="${r1(pad + fs)}" y="${r1(y + fs / 3)}">${xmlEscape(item.label)}</text>`);
+		});
+		out.push('</g>');
+	}
+	if (linkLegend.length > 0) {
+		const rowY = (i: number) => h - pad / 2 - legendH + (legend.length + i) * (fs + 6) + fs / 2;
+		out.push(`<g class="legend-links" fill="${xmlEscape(m.text)}">`);
+		out.push(`<text x="${r1(pad - fs / 2.4)}" y="${r1(rowY(0) + fs / 3)}" font-weight="bold">Links</text>`);
+		linkLegend.forEach((item, i) => {
+			const y = rowY(i + 1);
+			out.push(`<line x1="${r1(pad - fs / 2.4)}" y1="${r1(y)}" x2="${r1(pad + fs / 2.4)}" y2="${r1(y)}" stroke="${xmlEscape(item.color)}" stroke-width="2"/><text x="${r1(pad + fs)}" y="${r1(y + fs / 3)}">${xmlEscape(item.label)}</text>`);
 		});
 		out.push('</g>');
 	}

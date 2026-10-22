@@ -55,8 +55,9 @@ describe('view options', () => {
 	it('free options first, Pro options in one group, no reserved Bases keys', () => {
 		const opts = viewOptions({} as never);
 		const keys = opts.flatMap((o) => ('items' in o ? o.items.map((i) => i.key) : [o.key]));
-		expect(keys).toEqual([KEY.labels, KEY.orphans, KEY.spacing, KEY.linkSource, KEY.linkProperties, KEY.sizeBy, KEY.colorBy, KEY.shared, KEY.depth]);
-		expect(opts[5]).toMatchObject({ type: 'group', displayName: 'Pro' });
+		expect(keys).toEqual([KEY.labels, KEY.orphans, KEY.spacing, KEY.linkSource, KEY.linkProperties, KEY.arrows, KEY.sizeBy, KEY.colorBy, KEY.shared, KEY.depth, KEY.linkColors]);
+		expect(opts[6]).toMatchObject({ type: 'group', displayName: 'Pro' });
+		expect(opts[5]).toMatchObject({ type: 'toggle', key: KEY.arrows, displayName: 'Show arrows', default: false });
 		for (const k of keys) expect(['groupBy', 'order', 'sort', 'filters', 'summaries', 'name', 'type']).not.toContain(k);
 	});
 });
@@ -91,6 +92,7 @@ describe('pro facade', () => {
 
 	it('the sponsor terms match product.yaml', () => {
 		expect(SPONSORS).toMatchObject({ clientId: 'Ov23lic5UPGPZqhBlBGg', sponsorLogin: 'theluckystrike', minMonthlyUsd: 5, oneTimeUsd: 15, scope: 'read:user' });
+		expect(PRO_UI.proSummary).toContain('link colors by relation');
 		expect(PRO_UI.priceText).toBe('Sponsor $5 a month, or $15 once. When you have paid $15 in total, Pro stays on.');
 	});
 });

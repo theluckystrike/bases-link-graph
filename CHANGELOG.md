@@ -1,5 +1,11 @@
 # bases-link-graph
 
+## 1.4.0
+
+### Minor Changes
+
+- Add link arrows and relation names on hover, and Pro link colors by relation.
+
 ## 1.3.0
 
 ### Minor Changes

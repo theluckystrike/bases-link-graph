@@ -1,0 +1,15 @@
+filters:
+  and:
+    - file.inFolder("Bases Link Graph/Family")
+views:
+  - type: bases-link-graph
+    name: Relations
+    graphLabels: always
+    graphLinkSource: frontmatter
+    graphLinkProperties:
+      - parent
+      - friend
+    graphArrows: true
+    graphLinkColors: true
+  - type: table
+    name: Table

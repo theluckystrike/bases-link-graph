@@ -1,5 +1,5 @@
 import { BasesView, BooleanValue, NumberValue, StringValue, Keymap, Menu, Notice, parseLinktext, setIcon, type BasesAllOptions, type BasesPropertyId, type BasesViewConfig, type HoverParent, type HoverPopover, type MetadataCache, type QueryController, type TFile } from 'obsidian';
-import { buildGraph, colorScale, linkCounts, parseNumber, sizeScale, type ColorResult, type Graph, type LinkSource, type NodeInput, type PropValue } from './graph';
+import { arrowEnds, arrowHead, arrowSize, buildGraph, colorScale, linkCounts, linkRelations, parseNumber, relationColors, sizeScale, type ColorResult, type Graph, type LinkSource, type NodeInput, type PropValue, type ResolvedReference } from './graph';
 import { bounds, createLayout, hitTest, reheat, run, tick, type LayoutState } from './layout';
 import { isPro, onProChange } from './pro';
 import { readTheme, type Theme } from './theme';
@@ -19,7 +19,12 @@ export const KEY = {
 	depth: 'graphDepth',
 	focus: 'graphFocus',
 	layout: 'graphLayout',
+	arrows: 'graphArrows',
+	linkColors: 'graphLinkColors',
 } as const;
+
+/** Most relation lines in the hover card; the rest show as "+N more". */
+export const TIP_RELATIONS = 8;
 
 type Labels = 'auto' | 'always' | 'hover';
 
@@ -29,6 +34,10 @@ export interface ViewOptions {
 	spacing: number;
 	linkSource: LinkSource;
 	linkProperties: string[];
+	/** Free: arrowheads at the target of each link. */
+	arrows: boolean;
+	/** Pro: link edges colored by their relation, with a "Links" legend. */
+	linkColors: boolean;
 	sizeBy: BasesPropertyId | null;
 	colorBy: BasesPropertyId | null;
 	shared: BasesPropertyId[];
@@ -101,6 +110,19 @@ export function linksForFile(cache: MetadataCache, file: TFile, source: LinkSour
 	})), source === 'frontmatter' ? properties : []);
 }
 
+/**
+ * Relation names for each target of the note: property links by property name, body links and embeds as "body".
+ * Reads the same references as the link source: "All links" reads both, with no property filter.
+ */
+export function relationsForFile(cache: MetadataCache, file: TFile, source: LinkSource, properties: string[]): Record<string, string[]> {
+	const meta = cache.getFileCache(file);
+	const resolve = (link: string) => cache.getFirstLinkpathDest(parseLinktext(link).path, file.path)?.path ?? null;
+	const refs: ResolvedReference[] = [];
+	if (source !== 'body') for (const ref of meta?.frontmatterLinks ?? []) refs.push({ target: resolve(ref.link), key: ref.key });
+	if (source !== 'frontmatter') for (const ref of [...(meta?.links ?? []), ...(meta?.embeds ?? [])]) refs.push({ target: resolve(ref.link) });
+	return linkRelations(refs, source === 'frontmatter' ? properties : []);
+}
+
 /** Bases view that draws the notes of a base as a force-directed graph on a canvas. */
 export class GraphView extends BasesView implements HoverParent {
 	type = VIEW_ID;
@@ -109,6 +131,10 @@ export class GraphView extends BasesView implements HoverParent {
 	layout: LayoutState | null = null;
 	radius = new Float64Array(0);
 	color: ColorResult | null = null;
+	/** Pro: color slot per edge of the graph, from its first relation. */
+	linkColor: ColorResult | null = null;
+	/** Paths of the nodes that got an arrowhead in the last paint, one entry per arrowhead. */
+	arrowTips: string[] = [];
 	stats: GraphStats | null = null;
 	opts: ViewOptions | null = null;
 	/** Screen = layout x zoom + offset, in CSS pixels. */
@@ -128,6 +154,8 @@ export class GraphView extends BasesView implements HoverParent {
 	private raf: number | null = null;
 	private pointer: Pointer | null = null;
 	private fitted = false;
+	/** Last saved value of "Color links by relation"; null before the first render. */
+	private lastLinkColors: boolean | null = null;
 
 	constructor(
 		controller: QueryController,
@@ -198,13 +226,16 @@ export class GraphView extends BasesView implements HoverParent {
 		const sizeBy = c.getAsPropertyId(KEY.sizeBy);
 		const colorBy = c.getAsPropertyId(KEY.colorBy);
 		const saved = layout && typeof layout === 'object' && !Array.isArray(layout) ? (layout as Record<string, [number, number]>) : null;
-		const anyPro = sizeBy !== null || colorBy !== null || shared.length > 0 || depth > 0 || saved !== null;
+		const linkColors = c.get(KEY.linkColors) === true;
+		const anyPro = sizeBy !== null || colorBy !== null || shared.length > 0 || depth > 0 || saved !== null || linkColors;
 		return {
 			labels: labels === 'always' || labels === 'hover' ? labels : 'auto',
 			showOrphans: c.get(KEY.orphans) !== false,
 			spacing: Number.isFinite(spacing) && spacing >= 20 && spacing <= 200 ? spacing : 60,
 			linkSource: linkSource === 'body' || linkSource === 'frontmatter' ? linkSource : 'all',
 			linkProperties: Array.isArray(linkProperties) ? linkProperties.filter((p): p is string => typeof p === 'string' && p.trim() !== '') : [],
+			arrows: c.get(KEY.arrows) === true,
+			linkColors: pro && linkColors,
 			sizeBy: pro ? sizeBy : null,
 			colorBy: pro ? colorBy : null,
 			shared: pro ? shared : [],
@@ -221,7 +252,8 @@ export class GraphView extends BasesView implements HoverParent {
 		return this.data.data.map((e) => {
 			const values: Record<string, PropValue> = {};
 			for (const p of props) values[p] = toPlain(e.getValue(p));
-			return { id: e.file.path, label: e.file.basename, links: linksForFile(this.app.metadataCache, e.file, opts.linkSource, opts.linkProperties), props: values };
+			const cache = this.app.metadataCache;
+			return { id: e.file.path, label: e.file.basename, links: linksForFile(cache, e.file, opts.linkSource, opts.linkProperties), props: values, relations: relationsForFile(cache, e.file, opts.linkSource, opts.linkProperties) };
 		});
 	}
 
@@ -232,6 +264,7 @@ export class GraphView extends BasesView implements HoverParent {
 		const t0 = performance.now();
 		const opts = this.options();
 		this.opts = opts;
+		this.checkLinkColors();
 		const input = this.input(opts);
 		this.paths = new Set(input.map((r) => r.id));
 		const g = buildGraph(input, { showOrphans: opts.showOrphans, sharedProps: opts.shared, focus: opts.focus, depth: opts.focus ? opts.depth : 0 });
@@ -246,6 +279,7 @@ export class GraphView extends BasesView implements HoverParent {
 			opts.sizeBy ? sizeScale(rowsOf.map((r) => parseNumber(r.props?.[opts.sizeBy!] ?? null)), { min: 4, max: 18, fallback: 3 }) : g.nodes.map((n) => Math.min(14, 4 + Math.sqrt(n.degree) * 1.6)),
 		);
 		this.color = opts.colorBy ? colorScale(rowsOf.map((r) => r.props?.[opts.colorBy!] ?? null)) : null;
+		this.linkColor = opts.linkColors ? relationColors(g.edges) : null;
 		const buildMs = performance.now() - t0;
 		this.startLayout(g, opts);
 		this.stats = { rows: input.length, nodes: g.nodes.length, edges: g.edges.length, buildMs, layoutMs: this.stats?.layoutMs ?? 0, ticks: 0, drawMs: 0, frames: 0 };
@@ -258,6 +292,13 @@ export class GraphView extends BasesView implements HoverParent {
 		if (!this.fitted || opts.saved === null) this.fit();
 		this.draw();
 		this.animate();
+	}
+
+	/** A free user turned "Color links by relation" on: say that it is Pro. The option stays saved and is ignored. */
+	checkLinkColors(): void {
+		const on = this.config.get(KEY.linkColors) === true;
+		if (on && this.lastLinkColors === false && !isPro()) GraphView.needsPro('Link colors by relation');
+		this.lastLinkColors = on;
 	}
 
 	/** New layout; nodes keep their last position (or the saved layout) so an edit does not scramble the graph. */
@@ -340,6 +381,18 @@ export class GraphView extends BasesView implements HoverParent {
 		return this.color?.kind === 'number' ? (t.ramp[slot] ?? t.node) : (t.palette[slot % t.palette.length] ?? t.node);
 	}
 
+	/** Palette color of a slot, or the fallback for no slot. */
+	private slotColor(slot: number, t: Theme, fallback: string): string {
+		return slot < 0 ? fallback : (t.palette[slot % t.palette.length] ?? fallback);
+	}
+
+	/** Line color of edge k when it is not lit: shared values, the relation color (Pro), or the theme line color. */
+	edgeColor(k: number, t: Theme): string {
+		const e = this.graph?.edges[k];
+		if (e?.kind === 'shared') return t.shared;
+		return this.slotColor(this.linkColor?.slots[k] ?? -1, t, t.line);
+	}
+
 	/** Draws the graph to the view canvas. */
 	draw(): void {
 		const ctx = this.canvas.getContext('2d');
@@ -369,19 +422,36 @@ export class GraphView extends BasesView implements HoverParent {
 		const g = this.graph!;
 		const near = hover >= 0 ? new Set([hover, ...(this.neighbours[hover] ?? [])]) : null;
 		const lw = 1 / zoom;
+		const arrows = this.opts?.arrows === true;
+		this.arrowTips = [];
 		for (const kind of ['shared', 'link'] as const) {
 			ctx.setLineDash(kind === 'shared' ? [4 * lw, 3 * lw] : []);
-			for (const e of g.edges) {
-				if (e.kind !== kind) continue;
+			g.edges.forEach((e, k) => {
+				if (e.kind !== kind) return;
 				const lit = near !== null && (e.source === hover || e.target === hover);
+				const width = lit ? 2 : Math.min(3, 1 + Math.log2(e.weight));
 				ctx.globalAlpha = near && !lit ? 0.15 : kind === 'shared' ? 0.55 : 0.8;
-				ctx.strokeStyle = lit ? t.accent : kind === 'shared' ? t.shared : t.line;
-				ctx.lineWidth = lw * (lit ? 2 : Math.min(3, 1 + Math.log2(e.weight)));
+				ctx.strokeStyle = lit ? t.accent : this.edgeColor(k, t);
+				ctx.lineWidth = lw * width;
 				ctx.beginPath();
 				ctx.moveTo(l.x[e.source]!, l.y[e.source]!);
 				ctx.lineTo(l.x[e.target]!, l.y[e.target]!);
 				ctx.stroke();
-			}
+				if (!arrows) return;
+				ctx.fillStyle = ctx.strokeStyle;
+				for (const end of arrowEnds(e)) {
+					const [from, to] = end === 'target' ? [e.source, e.target] : [e.target, e.source];
+					const head = arrowHead(l.x[from]!, l.y[from]!, l.x[to]!, l.y[to]!, this.radius[to] ?? 5, arrowSize(width) * lw);
+					if (!head) continue;
+					ctx.beginPath();
+					ctx.moveTo(head[0]![0], head[0]![1]);
+					ctx.lineTo(head[1]![0], head[1]![1]);
+					ctx.lineTo(head[2]![0], head[2]![1]);
+					ctx.closePath();
+					ctx.fill();
+					this.arrowTips.push(g.nodes[to]!.id);
+				}
+			});
 		}
 		ctx.setLineDash([]);
 		for (let i = 0; i < l.n; i++) {
@@ -562,6 +632,9 @@ export class GraphView extends BasesView implements HoverParent {
 		this.tip.createDiv({ cls: 'bases-link-graph-tip-title', text: n.label });
 		const links = this.graph!.edges.filter((e) => e.kind === 'link' && (e.source === i || e.target === i)).length;
 		this.tip.createDiv({ text: `${links} ${links === 1 ? 'link' : 'links'} in this base` });
+		const lines = this.relationLines(i);
+		for (const line of lines.slice(0, TIP_RELATIONS)) this.tip.createDiv({ cls: 'bases-link-graph-tip-relation', text: line });
+		if (lines.length > TIP_RELATIONS) this.tip.createDiv({ cls: 'bases-link-graph-tip-relation', text: `+${lines.length - TIP_RELATIONS} more` });
 		for (const p of [this.opts?.sizeBy, this.opts?.colorBy]) {
 			if (!p) continue;
 			const entry = this.data.data[n.row];
@@ -569,6 +642,21 @@ export class GraphView extends BasesView implements HoverParent {
 			this.tip.createDiv({ text: `${this.config.getDisplayName(p)}: ${v === null ? '(no value)' : Array.isArray(v) ? v.join(', ') : String(v)}` });
 		}
 		this.tip.addClass('is-shown');
+	}
+
+	/** "parent → Atlas" for each relation from node i, then "friend ← Bea" for each relation to it. */
+	relationLines(i: number): string[] {
+		const g = this.graph;
+		const n = g?.nodes[i];
+		if (!g || !n) return [];
+		const out: { dir: number; name: string; label: string }[] = [];
+		for (const e of g.edges) {
+			if (e.kind !== 'link' || (e.source !== i && e.target !== i)) continue;
+			const other = g.nodes[e.source === i ? e.target : e.source]!;
+			for (const r of e.relations ?? []) out.push({ dir: r.from === n.row ? 0 : 1, name: r.name, label: other.label });
+		}
+		out.sort((a, b) => a.dir - b.dir || a.name.localeCompare(b.name) || a.label.localeCompare(b.label));
+		return out.map((r) => `${r.name} ${r.dir === 0 ? '→' : '←'} ${r.label}`);
 	}
 
 	private placeTip(evt: MouseEvent): void {
@@ -623,7 +711,7 @@ export class GraphView extends BasesView implements HoverParent {
 			setIcon(x, 'x');
 			x.addEventListener('click', () => this.setFocus(null));
 		}
-		if (o.proIgnored) this.bar.createSpan({ cls: 'bases-link-graph-pro-note', text: 'Size, color, shared values, depth and saved layouts are Pro features. They are off.' });
+		if (o.proIgnored) this.bar.createSpan({ cls: 'bases-link-graph-pro-note', text: 'Size, color, shared values, depth, link colors and saved layouts are Pro features. They are off.' });
 		this.button('maximize', 'Fit to view', () => {
 			this.fit();
 			this.draw();
@@ -641,23 +729,40 @@ export class GraphView extends BasesView implements HoverParent {
 		b.addEventListener('click', fn);
 	}
 
+	/** Two parts: node colors under the "Color by" name (Pro), then "Links" with one line per relation (Pro). */
 	private drawLegend(): void {
 		this.legendEl.empty();
 		const c = this.color;
-		if (!c || c.legend.length === 0 || !this.opts?.colorBy) {
+		const nodes = c !== null && c.legend.length > 0 && this.opts?.colorBy ? this.opts.colorBy : null;
+		const links = this.linkLegendColors();
+		if (!nodes && links.length === 0) {
 			this.legendEl.removeClass('is-shown');
 			return;
 		}
-		this.theme ??= readTheme(this.root, this.canvas);
-		const t = this.theme;
-		this.legendEl.createDiv({ cls: 'bases-link-graph-legend-title', text: this.config.getDisplayName(this.opts.colorBy) });
-		for (const item of c.legend) {
-			const row = this.legendEl.createDiv({ cls: 'bases-link-graph-legend-row' });
-			const sw = row.createSpan({ cls: 'bases-link-graph-swatch' });
-			sw.setCssStyles({ backgroundColor: item.slot < 0 ? t.node : c.kind === 'number' ? (t.ramp[item.slot] ?? t.node) : (t.palette[item.slot % t.palette.length] ?? t.node) });
-			row.createSpan({ text: `${item.label} (${item.count})` });
+		if (nodes) {
+			this.legendEl.createDiv({ cls: 'bases-link-graph-legend-title', text: this.config.getDisplayName(nodes) });
+			for (const item of this.legendColors()) this.legendRow(item, false);
+		}
+		if (links.length > 0) {
+			this.legendEl.createDiv({ cls: 'bases-link-graph-legend-title bases-link-graph-legend-links', text: 'Links' });
+			for (const item of links) this.legendRow(item, true);
 		}
 		this.legendEl.addClass('is-shown');
+	}
+
+	private legendRow(item: { label: string; color: string }, line: boolean): void {
+		const row = this.legendEl.createDiv({ cls: line ? 'bases-link-graph-legend-row is-link' : 'bases-link-graph-legend-row' });
+		const sw = row.createSpan({ cls: line ? 'bases-link-graph-swatch is-line' : 'bases-link-graph-swatch' });
+		sw.setCssStyles({ backgroundColor: item.color });
+		row.createSpan({ text: item.label });
+	}
+
+	/** Pro: the "Links" legend entries with their colors and edge counts, for the view and the SVG export. */
+	linkLegendColors(): { label: string; color: string }[] {
+		const c = this.linkColor;
+		if (!c || !this.opts?.linkColors) return [];
+		const t = this.currentTheme();
+		return c.legend.map((item) => ({ label: `${item.label} (${item.count})`, color: this.slotColor(item.slot, t, t.line) }));
 	}
 
 	/** Legend entries with their colors, for the SVG export. */
@@ -693,6 +798,7 @@ export function viewOptions(config: BasesViewConfig): BasesAllOptions[] {
 		{ type: 'slider', key: KEY.spacing, displayName: 'Link length', default: 60, min: 20, max: 200, step: 10 },
 		{ type: 'dropdown', key: KEY.linkSource, displayName: 'Draw links from', default: 'all', options: { all: 'All links', body: 'Note body', frontmatter: 'Properties' } },
 		{ type: 'multitext', key: KEY.linkProperties, displayName: 'Link properties (empty = all)', default: [], shouldHide: () => config.get(KEY.linkSource) !== 'frontmatter' },
+		{ type: 'toggle', key: KEY.arrows, displayName: 'Show arrows', default: false },
 		{
 			type: 'group',
 			displayName: 'Pro',
@@ -701,6 +807,7 @@ export function viewOptions(config: BasesViewConfig): BasesAllOptions[] {
 				{ type: 'property', key: KEY.colorBy, displayName: 'Color by', placeholder: 'One color' },
 				{ type: 'multitext', key: KEY.shared, displayName: 'Join notes that share', default: [] },
 				{ type: 'slider', key: KEY.depth, displayName: 'Local depth (0 = all notes)', default: 0, min: 0, max: 5, step: 1 },
+				{ type: 'toggle', key: KEY.linkColors, displayName: 'Color links by relation', default: false },
 			],
 		},
 	];

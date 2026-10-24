@@ -756,24 +756,29 @@ export class GraphView extends BasesView implements HoverParent {
 		}
 		this.fillTip(i);
 		this.placeTip(evt);
-		this.app.workspace.trigger('hover-link', { event: evt, source: VIEW_ID, hoverParent: this, targetEl: this.canvas, sourcePath: '', ...this.hoverTarget(i) });
+		const target = this.hoverTarget(i);
+		if (target) this.app.workspace.trigger('hover-link', { event: evt, source: VIEW_ID, hoverParent: this, targetEl: this.canvas, ...target });
 	}
 
 	/**
 	 * Link text for the page preview of node i. The subpath previews the first heading with that path. When that is not
 	 * the line of this node ("Notes [2]"), the preview shows the note and scrolls to the line of this node.
+	 * The page preview cuts the link text at "#". For a note path with "#", the link text is only the subpath and the
+	 * source path names the note, as a link inside the note does ("[[#Heading]]").
 	 */
-	hoverTarget(i: number): { linktext: string; state?: { scroll: number } } {
+	hoverTarget(i: number): { linktext: string; sourcePath: string; state?: { scroll: number } } | null {
 		const n = this.graph?.nodes[i];
-		if (!n) return { linktext: '' };
-		if (!n.sub) return { linktext: n.id };
-		const path = this.notePath(i);
+		if (!n) return null;
+		const path = n.sub ? this.notePath(i) : n.id;
+		const cut = parseLinktext(path).path !== path;
+		const link = (sub: string) => (cut ? { linktext: sub, sourcePath: path } : { linktext: `${path}${sub}`, sourcePath: '' });
+		if (!n.sub) return link('');
 		const subpath = this.subpathOf(i);
 		const file = this.app.vault.getFileByPath(path);
 		const cache = file ? this.app.metadataCache.getFileCache(file) : null;
 		const hit = cache ? resolveSubpath(cache, subpath) : null;
-		if (n.sub.kind === 'block' || !hit || hit.start.line === n.sub.line) return { linktext: `${path}${subpath}` };
-		return { linktext: path, state: { scroll: n.sub.line } };
+		if (n.sub.kind === 'block' || !hit || hit.start.line === n.sub.line) return link(subpath);
+		return { ...link(''), state: { scroll: n.sub.line } };
 	}
 
 	private fillTip(i: number): void {

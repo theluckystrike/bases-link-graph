@@ -117,7 +117,7 @@ When Pro is off, the Pro options stay saved in the base file and the graph ignor
 
 After a minor or major update, this plugin opens one What's new tab in the background. The tab and settings card suggest other NoteMods plugins and Zovo Chat and link to notemods.com for feedback ([privacy](https://notemods.com/privacy/)). The tab sends no data. Turn the tab off in Settings.
 
-The view options are in the base toolbar, saved with each view in the base file.
+View options (base toolbar, saved in the base file):
 
 | Option | What it does |
 | --- | --- |

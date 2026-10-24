@@ -356,6 +356,138 @@ describe(`${pluginId} headings and blocks as nodes in the real app`, function ()
 		}
 	});
 
+	it('criterion A13: the hover preview of a note with "#" in its path shows that note, its heading and its block (1.5.2)', async function () {
+		// Obsidian's page preview cuts the link text at "#" (parseLinktext). The file explorer sends "Hash/Draft#2.md"
+		// and gets "Hash/Draft.md" with a section "2.md" that does not exist. The graph sends the subpath as link text
+		// and the note as source path, as a link inside the note does ("[[#Draft two#Plan]]").
+		const HASH = `${DIR}/Hash`;
+		const HBASE = `${DIR}/Hash graph.base`;
+		const DRAFT = `${HASH}/Draft.md`;
+		const D2 = `${HASH}/Draft#2.md`;
+		const PLAIN = `${HASH}/Plain.md`;
+		await obsidianPage.write(DRAFT, 'Wrong note: this is Draft.\n');
+		await obsidianPage.write(D2, '# Draft two\n\nRight note: this is Draft#2. See [[#^b1]].\n\n## Plan\n\nPlan text of Draft#2.\n\n## Later\n\nBlock text of Draft#2. ^b1\n');
+		await obsidianPage.write(PLAIN, 'Plain note text.\n');
+		await obsidianPage.write(HBASE, `filters:\n  and:\n    - file.inFolder("${HASH}")\nviews:\n  - type: bases-link-graph\n    name: Hash\n    graphLabels: always\n    graphHeadings: all\n`);
+		await browser.executeObsidian(({ app }, id) => {
+			interface PP {
+				enabled: boolean;
+				enable(save: boolean): Promise<void>;
+				instance: { options: Record<string, boolean> };
+			}
+			const pp = (app as unknown as { internalPlugins: { getPluginById(x: string): PP | null } }).internalPlugins.getPluginById('page-preview')!;
+			if (!pp.enabled) void pp.enable(false);
+			pp.instance.options[id] = false;
+			const w = window as unknown as { __blgHash?: string[]; __blgHashRef?: unknown };
+			w.__blgHash = [];
+			const ws = app.workspace as unknown as { on(name: string, cb: (e: { linktext: string; sourcePath?: string }) => void): unknown };
+			w.__blgHashRef = ws.on('hover-link', (e) => {
+				w.__blgHash!.push(`${e.linktext} @ ${e.sourcePath ?? ''}`);
+			});
+		}, pluginId);
+		const popText = () => browser.execute(() => [...document.querySelectorAll('.hover-popover')].map((p) => p.textContent ?? '').join(' | '));
+		const noPopover = async () => {
+			await browser.action('pointer').move({ x: 5, y: 5 }).perform();
+			await browser.waitUntil(async () => (await popText()) === '', { timeout: 8000, timeoutMsg: 'a hover popover did not close' });
+		};
+		const hoverNode = async (node: string) => {
+			const pt = await nodePoint(node);
+			await browser.action('pointer').move({ x: pt.x + 40, y: pt.y + 40 }).move({ x: pt.x, y: pt.y }).perform();
+		};
+		const files = () => browser.executeObsidian(({ app }) => app.vault.getFiles().map((f) => f.path).sort());
+		try {
+			await browser.waitUntil(
+				async () =>
+					browser.executeObsidian(({ app }, p) => {
+						const f = app.vault.getFileByPath(p);
+						const c = f ? app.metadataCache.getFileCache(f) : null;
+						return c?.headings?.length === 3 && c.blocks?.['b1'] !== undefined;
+					}, D2),
+				{ timeout: 10000, timeoutMsg: 'Draft#2 has no headings and block in the cache' },
+			);
+			await browser.executeObsidian(async ({ app }, link) => {
+				await app.workspace.openLinkText(link, '', false);
+			}, `${HBASE}#Hash`);
+			await waitFor((x) => x.view === 'Hash' && x.nodes.includes(`${D2}#Plan`) && x.nodes.includes(`${D2}#^b1`) && x.nodes.includes(PLAIN) && x.cooled, 'hash view did not settle');
+
+			// A popover of an earlier test can still be open.
+			await noPopover();
+			// Core probe: the file path as link text (the file explorer form) opens a popover for another note.
+			await browser.executeObsidian(({ app }, id, path) => {
+				const el = document.body.createDiv({ cls: 'blg-hash-probe' });
+				el.setCssStyles({ position: 'fixed', left: '200px', top: '200px', width: '20px', height: '20px' });
+				const parent = { hoverPopover: null };
+				(window as unknown as { __blgProbe: unknown }).__blgProbe = parent;
+				app.workspace.trigger('hover-link', { event: new MouseEvent('mouseover'), source: id, hoverParent: parent, targetEl: el, linktext: path, sourcePath: '' });
+			}, pluginId, D2);
+			let probe = '';
+			await browser.waitUntil(async () => (probe = await popText()) !== '', { timeout: 8000, interval: 100, timeoutMsg: 'the core probe opened no popover' });
+			expect(probe).not.toContain('Right note');
+			expect(probe).toContain('2.md');
+			await browser.executeObsidian(() => {
+				const parent = (window as unknown as { __blgProbe: { hoverPopover: { hide(): void } | null } }).__blgProbe;
+				parent.hoverPopover?.hide();
+				document.querySelector('.blg-hash-probe')?.remove();
+			});
+			await noPopover();
+			await browser.execute(() => {
+				(window as unknown as { __blgHash: string[] }).__blgHash.length = 0;
+			});
+
+			// The graph: the note, its heading and its block preview the right note.
+			for (const [node, title, text] of [
+				[D2, 'Draft#2', 'Right note: this is Draft#2.'],
+				[`${D2}#Plan`, 'Draft#2 › Plan', 'Plan text of Draft#2.'],
+				[`${D2}#^b1`, 'Draft#2 › ^b1', 'Block text of Draft#2.'],
+			] as const) {
+				await hoverNode(node);
+				let shownTitle = '';
+				await browser.waitUntil(
+					async () => {
+						shownTitle = await browser.execute(() => document.querySelector('.workspace-leaf.mod-active .bases-link-graph-tip.is-shown .bases-link-graph-tip-title')?.textContent ?? '');
+						return shownTitle !== '';
+					},
+					{ timeout: 5000, timeoutMsg: `no hover card on ${node}` },
+				);
+				expect(shownTitle).toBe(title);
+				let shown = '';
+				await browser.waitUntil(async () => (shown = await popText()).includes(text), { timeout: 8000, timeoutMsg: `no preview with "${text}" for ${node}; popover "${shown}"` });
+				expect(shown).not.toContain('Wrong note');
+				expect(shown).not.toContain('Unable to find');
+				await noPopover();
+			}
+			const sent = await browser.execute(() => (window as unknown as { __blgHash: string[] }).__blgHash);
+			expect(sent).toEqual(expect.arrayContaining([` @ ${D2}`, `#Draft two#Plan @ ${D2}`, `#^b1 @ ${D2}`]));
+			// No event sends the path with "#" as link text.
+			expect(sent.filter((l) => l.startsWith(HASH))).toEqual([]);
+
+			// Control: a note with a plain name keeps the 1.5.1 link text.
+			await hoverNode(PLAIN);
+			let plain = '';
+			await browser.waitUntil(async () => (plain = await popText()).includes('Plain note text.'), { timeout: 8000, timeoutMsg: 'no hover preview for the Plain note' });
+			const sent2 = await browser.execute(() => (window as unknown as { __blgHash: string[] }).__blgHash);
+			expect(sent2.filter((l) => l.includes(HASH)).pop()).toBe(`${PLAIN} @ `);
+			await noPopover();
+
+			// A click on the Draft#2 node opens Draft#2 and makes no new note.
+			const before = await files();
+			const pt = await nodePoint(D2);
+			await browser.action('pointer').move({ x: pt.x, y: pt.y }).down().up().perform();
+			await browser.waitUntil(async () => (await browser.executeObsidian(({ app }) => app.workspace.getActiveFile()?.path ?? '')) === D2, { timeout: 10000, timeoutMsg: 'the click did not open Draft#2' });
+			expect(await files()).toEqual(before);
+		} finally {
+			await browser.action('pointer').move({ x: 5, y: 5 }).perform();
+			await browser.executeObsidian(({ app }, id) => {
+				const pp = (app as unknown as { internalPlugins: { getPluginById(x: string): { instance: { options: Record<string, boolean> } } | null } }).internalPlugins.getPluginById('page-preview');
+				if (pp) delete pp.instance.options[id];
+				const w = window as unknown as { __blgHashRef?: Parameters<typeof app.workspace.offref>[0] };
+				if (w.__blgHashRef) app.workspace.offref(w.__blgHashRef);
+				document.querySelector('.blg-hash-probe')?.remove();
+			}, pluginId);
+			for (const f of [HBASE, DRAFT, D2, PLAIN]) await obsidianPage.delete(f);
+			await obsidianPage.delete(HASH);
+		}
+	});
 	it('criterion A10: renaming a heading redraws; its links fall back to the note', async function () {
 		await openView('Linked headings');
 		await waitFor((x) => x.view === 'Linked headings' && x.nodes.includes(`${EA}#Repair`), 'linked view not drawn');

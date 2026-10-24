@@ -1,10 +1,16 @@
 # bases-link-graph
 
+## 1.5.2
+
+### Patch Changes
+
+- The hover preview of a note with "#" in its name or folder now shows that note, not a different note. Its heading and block nodes now preview that note at the heading or block.
+
 ## 1.5.1
 
 ### Patch Changes
 
-- The hover preview of a heading node now shows its own section when two headings have the same path.
+- The hover preview of a heading node now opens at its own heading, marked, when two headings have the same path.
 - A click on a heading node in Reading view now scrolls to its own heading when two headings have the same path.
 
 ## 1.5.0

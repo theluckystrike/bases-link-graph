@@ -685,7 +685,9 @@ export class GraphView extends BasesView implements HoverParent {
 	static showLine(view: unknown, path: string, line: number): void {
 		if (!(view instanceof MarkdownView) || view.file?.path !== path) return;
 		if (view.getMode() === 'preview') {
-			view.previewMode.applyScroll(line);
+			// The ephemeral line waits for the render, as the subpath scroll does, and runs after it.
+			// applyScroll alone runs before the render and the subpath scroll then moves the view to the first heading.
+			view.setEphemeralState({ line });
 			return;
 		}
 		const pos = { line, ch: 0 };
@@ -754,7 +756,24 @@ export class GraphView extends BasesView implements HoverParent {
 		}
 		this.fillTip(i);
 		this.placeTip(evt);
-		this.app.workspace.trigger('hover-link', { event: evt, source: VIEW_ID, hoverParent: this, targetEl: this.canvas, linktext: n.sub ? `${this.notePath(i)}${this.subpathOf(i)}` : n.id, sourcePath: '' });
+		this.app.workspace.trigger('hover-link', { event: evt, source: VIEW_ID, hoverParent: this, targetEl: this.canvas, sourcePath: '', ...this.hoverTarget(i) });
+	}
+
+	/**
+	 * Link text for the page preview of node i. The subpath previews the first heading with that path. When that is not
+	 * the line of this node ("Notes [2]"), the preview shows the note and scrolls to the line of this node.
+	 */
+	hoverTarget(i: number): { linktext: string; state?: { scroll: number } } {
+		const n = this.graph?.nodes[i];
+		if (!n) return { linktext: '' };
+		if (!n.sub) return { linktext: n.id };
+		const path = this.notePath(i);
+		const subpath = this.subpathOf(i);
+		const file = this.app.vault.getFileByPath(path);
+		const cache = file ? this.app.metadataCache.getFileCache(file) : null;
+		const hit = cache ? resolveSubpath(cache, subpath) : null;
+		if (n.sub.kind === 'block' || !hit || hit.start.line === n.sub.line) return { linktext: `${path}${subpath}` };
+		return { linktext: path, state: { scroll: n.sub.line } };
 	}
 
 	private fillTip(i: number): void {

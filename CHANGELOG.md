@@ -1,5 +1,12 @@
 # bases-link-graph
 
+## 1.5.1
+
+### Patch Changes
+
+- The hover preview of a heading node now shows its own section when two headings have the same path.
+- A click on a heading node in Reading view now scrolls to its own heading when two headings have the same path.
+
 ## 1.5.0
 
 ### Minor Changes

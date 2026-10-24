@@ -1,11 +1,10 @@
 {
 	"id": "bases-link-graph",
 	"name": "Bases Link Graph",
-	"version": "1.5.0",
+	"version": "1.5.1",
 	"changes": [
-		"Set Headings and blocks to Linked to show a link to a heading or block as a small node on its note.",
-		"Choose All headings to show each heading. A link then starts at the heading that holds it.",
-		"Pro can nest headings under their parent heading and limit the heading level."
+		"The hover preview of a heading node now shows its own section when two headings have the same path.",
+		"A click on a heading node in Reading view now scrolls to its own heading when two headings have the same path."
 	],
 	"tip": "Click a heading node to open its note at that heading.",
 	"thanks": "Hi, I am Michael, a solo developer in Poland. Bases Link Graph is one of over 100 small plugins that I make. Thank you for using it with Bases. Bases is still new, and your setups teach me a lot.",

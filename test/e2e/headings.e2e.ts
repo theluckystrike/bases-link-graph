@@ -102,6 +102,31 @@ async function setPro(on: boolean): Promise<void> {
 	);
 }
 
+/** Screen point of node `node` in the shown graph view, and the line of that node. */
+async function nodePoint(node: string): Promise<{ x: number; y: number; line: number }> {
+	return browser.executeObsidian(({ app }, id, n) => {
+		interface V {
+			containerEl: HTMLElement;
+			graph: { nodes: { id: string; sub?: { line: number } }[] } | null;
+			screenPos(path: string): { x: number; y: number } | null;
+		}
+		const pl = (app as unknown as { plugins: { plugins: Record<string, { views: Set<V> }> } }).plugins.plugins[id]!;
+		const v = [...pl.views].filter((x) => x.containerEl.isConnected && x.containerEl.offsetParent !== null && x.graph).pop()!;
+		const pos = v.screenPos(n)!;
+		const rect = v.containerEl.querySelector('canvas')!.getBoundingClientRect();
+		const line = v.graph?.nodes.find((x) => x.id === n)?.sub?.line ?? -1;
+		return { x: Math.round(rect.left + pos.x), y: Math.round(rect.top + pos.y), line };
+	}, pluginId, node);
+}
+
+/** Lines of the two "Notes" headings in Code notes. */
+async function notesLines(): Promise<number[]> {
+	return browser.executeObsidian(({ app }, path) => {
+		const f = app.vault.getFileByPath(path);
+		return ((f ? app.metadataCache.getFileCache(f)?.headings : null) ?? []).filter((x) => x.heading === 'Notes').map((x) => x.position.start.line);
+	}, CN);
+}
+
 const LINKED_NODES = [AR, CN, `${CN}#C# basics`, `${CN}#Notes`, EA, `${EA}#Damage`, `${EA}#Methods`, `${EA}#Repair`, `${EA}#^q1`, RL, PNG].sort();
 const LINKED_LINKS = [
 	`${AR} -> ${RL}`,
@@ -231,6 +256,104 @@ describe(`${pluginId} headings and blocks as nodes in the real app`, function ()
 		);
 		expect(opened.second).not.toBe(opened.first);
 		expect(opened.cursor).toBe(opened.second);
+	});
+
+	it('criterion A11b in Reading view: a click on the second "Notes" heading scrolls to the second one (review R2)', async function () {
+		const before = await obsidianPage.read(CN);
+		// Filler text puts the second "Notes" far below the first, so the scroll position tells the two apart.
+		const filler = Array.from({ length: 80 }, (_, k) => `Filler paragraph ${k + 1}.`).join('\n\n');
+		await browser.executeObsidian(({ app }) => {
+			(app.vault as unknown as { setConfig(k: string, v: unknown): void }).setConfig('defaultViewMode', 'preview');
+		});
+		try {
+			// Filler after the second section lets the view scroll that heading to the top.
+			await obsidianPage.write(CN, `${before.replace('First notes.\n', `First notes.\n\n${filler}\n`)}\n${filler}\n`);
+			await browser.waitUntil(async () => (await notesLines())[1]! > 100, { timeout: 10000, timeoutMsg: 'the long Code notes was not indexed' });
+			const [first, second] = await notesLines();
+			await openView('All headings');
+			await waitFor((x) => x.view === 'All headings' && x.nodes.includes(`${CN}#Notes [2]`) && x.cooled, 'all headings view did not settle');
+			let pt = await nodePoint(`${CN}#Notes [2]`);
+			await browser.waitUntil(async () => (pt = await nodePoint(`${CN}#Notes [2]`)).line === second, { timeout: 10000, timeoutMsg: 'the graph did not redraw the long Code notes' });
+			await waitFor((x) => x.cooled, 'layout did not settle after the redraw');
+			pt = await nodePoint(`${CN}#Notes [2]`);
+			await browser.action('pointer').move({ x: pt.x + 40, y: pt.y + 40 }).move({ x: pt.x, y: pt.y }).down().up().perform();
+			let got: { path: string; mode: string; scroll: number } | null = null;
+			const ok = await browser
+				.waitUntil(
+					async () => {
+						got = await browser.executeObsidian(({ app, obsidian }) => {
+							const v = app.workspace.getActiveViewOfType(obsidian.MarkdownView);
+							return { path: v?.file?.path ?? '', mode: v?.getMode() ?? '', scroll: v ? v.previewMode.getScroll() : -1 };
+						});
+						return got.path === CN && got.mode === 'preview' && Math.abs(got.scroll - second!) <= 3;
+					},
+					{ timeout: 10000 },
+				)
+				.catch(() => false);
+			if (!ok) throw new Error(`Reading view did not scroll to the second Notes at line ${second} (first ${first}); last ${JSON.stringify(got)}`);
+			expect(second! - first!).toBeGreaterThan(100);
+		} finally {
+			await browser.executeObsidian(({ app }) => {
+				(app.vault as unknown as { setConfig(k: string, v: unknown): void }).setConfig('defaultViewMode', 'source');
+			});
+			await obsidianPage.write(CN, before);
+		}
+		await browser.waitUntil(async () => (await notesLines())[1]! < 20, { timeout: 10000, timeoutMsg: 'Code notes was not restored' });
+	});
+
+	it('criterion A11c: the hover preview of the second "Notes" heading shows the second section (review R2)', async function () {
+		const events: { linktext: string; scroll: number | null }[] = [];
+		await browser.executeObsidian(({ app }, id) => {
+			interface PP {
+				enabled: boolean;
+				enable(save: boolean): Promise<void>;
+				instance: { options: Record<string, boolean> };
+			}
+			const pp = (app as unknown as { internalPlugins: { getPluginById(x: string): PP | null } }).internalPlugins.getPluginById('page-preview')!;
+			if (!pp.enabled) void pp.enable(false);
+			// The graph is a hover source that needs Ctrl or Cmd by default. The test turns that off, as the user can.
+			pp.instance.options[id] = false;
+			const w = window as unknown as { __blgHover?: { linktext: string; scroll: number | null }[]; __blgRef?: unknown };
+			w.__blgHover = [];
+			const ws = app.workspace as unknown as { on(name: string, cb: (e: { linktext: string; state?: { scroll?: number } }) => void): unknown };
+			w.__blgRef = ws.on('hover-link', (e) => {
+				w.__blgHover!.push({ linktext: e.linktext, scroll: e.state?.scroll ?? null });
+			});
+		}, pluginId);
+		try {
+			await openView('All headings');
+			await waitFor((x) => x.view === 'All headings' && x.nodes.includes(`${CN}#Notes [2]`) && x.cooled, 'all headings view did not settle');
+			const [first, second] = await notesLines();
+			const pt = await nodePoint(`${CN}#Notes [2]`);
+			expect(pt.line).toBe(second);
+			await browser.action('pointer').move({ x: pt.x + 40, y: pt.y + 40 }).move({ x: pt.x, y: pt.y }).perform();
+			let shown: { heading: string; next: string } | null = null;
+			await browser.waitUntil(
+				async () => {
+					shown = await browser.execute(() => {
+						const pop = [...document.querySelectorAll('.hover-popover')].pop();
+						const flash = pop?.querySelector('.markdown-preview-view .is-flashing');
+						if (!flash) return null;
+						return { heading: flash.textContent?.trim() ?? '', next: flash.nextElementSibling?.textContent?.trim() ?? '' };
+					});
+					return shown !== null;
+				},
+				{ timeout: 8000, timeoutMsg: 'no hover preview with a marked section for the second Notes heading' },
+			);
+			expect(shown).toEqual({ heading: 'Notes', next: 'Second notes with the same heading.' });
+			events.push(...(await browser.execute(() => (window as unknown as { __blgHover: { linktext: string; scroll: number | null }[] }).__blgHover)));
+			const ev = events.filter((e) => e.linktext.startsWith(CN)).pop();
+			expect(ev).toEqual({ linktext: CN, scroll: second });
+			expect(second).not.toBe(first);
+		} finally {
+			await browser.action('pointer').move({ x: 5, y: 5 }).perform();
+			await browser.executeObsidian(({ app }, id) => {
+				const pp = (app as unknown as { internalPlugins: { getPluginById(x: string): { instance: { options: Record<string, boolean> } } | null } }).internalPlugins.getPluginById('page-preview');
+				if (pp) delete pp.instance.options[id];
+				const w = window as unknown as { __blgRef?: Parameters<typeof app.workspace.offref>[0] };
+				if (w.__blgRef) app.workspace.offref(w.__blgRef);
+			}, pluginId);
+		}
 	});
 
 	it('criterion A10: renaming a heading redraws; its links fall back to the note', async function () {

@@ -6,7 +6,7 @@ Bases Link Graph draws the notes that a base selects as a graph. Each note is a 
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/bases-link-graph.gif" alt="A base of 30 team notes drawn as a graph, then colored by type, joined by team and narrowed to the notes near one project" width="720">
 
-Free: filtered notes, links, navigation, previews, embeds, live updates. Pro: property styling, link colors, shared-value edges, local depth, exports, saved layouts. $15 one time or $5 a month: [Sponsor](https://github.com/sponsors/theluckystrike?metadata_source=bases-link-graph) or [$15 one-time offer](https://github.com/sponsors/theluckystrike/sponsorships?tier_id=666162&metadata_source=bases-link-graph).
+Free: filtered notes, links, navigation, previews, embeds, live updates. Pro: property styling, link colors, nested headings with a level limit, shared-value edges, local depth, exports, saved layouts. $15 one time or $5 a month: [Sponsor](https://github.com/sponsors/theluckystrike?metadata_source=bases-link-graph) or [$15 one-time offer](https://github.com/sponsors/theluckystrike/sponsorships?tier_id=666162&metadata_source=bases-link-graph).
 
 ## Features
 

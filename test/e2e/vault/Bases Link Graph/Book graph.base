@@ -1,0 +1,27 @@
+filters:
+  and:
+    - file.inFolder("Bases Link Graph/Book")
+views:
+  - type: bases-link-graph
+    name: Linked headings
+    graphLabels: always
+    graphArrows: true
+    graphHeadings: linked
+  - type: bases-link-graph
+    name: All headings
+    graphLabels: always
+    graphArrows: true
+    graphHeadings: all
+  - type: bases-link-graph
+    name: Notes only
+    graphLabels: always
+    graphArrows: true
+  - type: bases-link-graph
+    name: Nested
+    graphLabels: always
+    graphArrows: true
+    graphHeadings: all
+    graphHeadingChain: true
+    graphHeadingLevel: 2
+  - type: table
+    name: Table

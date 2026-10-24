@@ -1,5 +1,11 @@
 # bases-link-graph
 
+## 1.5.0
+
+### Minor Changes
+
+- 3e7f5b4: Show links to headings and blocks as small nodes on their note, with an option for all headings and Pro heading nesting and level limit.
+
 ## 1.4.0
 
 ### Minor Changes

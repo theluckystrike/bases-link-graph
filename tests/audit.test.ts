@@ -58,7 +58,7 @@ describe('pointer cancel', () => {
 		const canvas = (v as unknown as { canvas: HTMLCanvasElement }).canvas;
 		Object.assign(v, { opts: { saved: null }, layout: l, radius: new Float64Array([10]), graph: { nodes: [{ id: 'a.md', label: 'a', row: 0, degree: 0 }], edges: [], hidden: { orphans: 0, outside: 0 } } });
 		const open = vi.spyOn(v, 'open').mockImplementation(() => undefined);
-		Object.assign(v as object, { pointer: { mode: 'node', node: 0, startX: 0, startY: 0, moved: true, wasFixed: false } });
+		Object.assign(v as object, { pointer: { mode: 'node', node: 0, drag: 0, startX: 0, startY: 0, moved: true, wasFixed: false } });
 		l.fixed[0] = 1;
 		l.alphaTarget = 0.1;
 		canvas.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 1 }));

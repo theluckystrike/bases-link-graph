@@ -29,6 +29,28 @@
 		"wait": 500
 	},
 	{
+		"feature": "headings",
+		"caption": "Free: Linked headings and blocks. Each link to a heading or block points to a small node on its note.",
+		"note": "Book graph.base",
+		"eval": "(async () => { app.plugins.plugins['bases-link-graph'].pro.signOut(); await app.workspace.openLinkText('Bases Link Graph/Book graph.base#Linked headings', '', false); await new Promise((r) => setTimeout(r, 1800)); let v = null; for (let k = 0; k < 40; k++) { v = [...app.plugins.plugins['bases-link-graph'].views].filter((x) => x.containerEl.isConnected && x.containerEl.offsetParent !== null && x.graph && x.config.name === 'Linked headings').pop(); if (v && v.graph.nodes.length === 11) break; await new Promise((r) => setTimeout(r, 150)); } if (!v || v.graph.nodes.length !== 11) throw new Error('Wrong Linked headings graph: ' + (v ? v.graph.nodes.length : 'none')); if (v.graph.edges.filter((e) => e.kind === 'part').length !== 6) throw new Error('Wrong part lines'); return '5 notes, 6 headings and blocks, 10 links'; })()",
+		"wait": 800
+	},
+	{
+		"feature": "all-headings",
+		"caption": "Free: All headings. The image hangs from the Damage chapter, and Ideas links to Methods.",
+		"note": "Book graph.base",
+		"eval": "(async () => { app.plugins.plugins['bases-link-graph'].pro.signOut(); await app.workspace.openLinkText('Bases Link Graph/Book graph.base#All headings', '', false); await new Promise((r) => setTimeout(r, 1800)); let v = null; for (let k = 0; k < 40; k++) { v = [...app.plugins.plugins['bases-link-graph'].views].filter((x) => x.containerEl.isConnected && x.containerEl.offsetParent !== null && x.graph && x.config.name === 'All headings').pop(); if (v && v.graph.nodes.length === 14) break; await new Promise((r) => setTimeout(r, 150)); } if (!v || v.graph.nodes.length !== 14) throw new Error('Wrong All headings graph: ' + (v ? v.graph.nodes.length : 'none')); const g = v.graph; const ids = g.edges.filter((e) => e.kind === 'link').map((e) => g.nodes[e.source].id + ' > ' + g.nodes[e.target].id); if (!ids.includes('Bases Link Graph/Book/Ending Aging.md#Damage > Bases Link Graph/Book/cell-diagram.png')) throw new Error('No link from the Damage heading to the image'); return '14 nodes, 11 links'; })()",
+		"wait": 800
+	},
+	{
+		"feature": "nested-headings",
+		"caption": "Pro: headings nest under their parent heading, with levels 1 and 2 shown.",
+		"note": "Book graph.base",
+		"eval": "(async () => { app.plugins.plugins['bases-link-graph'].pro.opts.http = async () => ({ status: 200, json: { data: { viewer: { login: 'demo-reader' }, user: { sponsorshipForViewerAsSponsor: { isActive: true, isOneTimePayment: false, tier: { name: '$5 a month', monthlyPriceInCents: 500 } } } } } }); app.secretStorage.setSecret('bases-link-graph-github-token', 'gho_' + '0'.repeat(36)); await app.plugins.plugins['bases-link-graph'].pro.refreshNow(); await app.workspace.openLinkText('Bases Link Graph/Book graph.base#Nested', '', false); await new Promise((r) => setTimeout(r, 1800)); let v = null; for (let k = 0; k < 40; k++) { v = [...app.plugins.plugins['bases-link-graph'].views].filter((x) => x.containerEl.isConnected && x.containerEl.offsetParent !== null && x.graph && x.config.name === 'Nested').pop(); if (v && v.graph.nodes.length === 13) break; await new Promise((r) => setTimeout(r, 150)); } if (!v || v.graph.nodes.length !== 13) throw new Error('Wrong Nested graph: ' + (v ? v.graph.nodes.length : 'none')); const g = v.graph; const d = g.nodes.find((n) => n.id === 'Bases Link Graph/Book/Ending Aging.md#Damage'); if (!d || g.nodes[d.sub.parent].id !== 'Bases Link Graph/Book/Ending Aging.md#Ending Aging') throw new Error('Damage is not nested'); return '13 nodes, nested'; })()",
+		"wait": 800,
+		"after": "(async () => { app.plugins.plugins['bases-link-graph'].pro.signOut(); return 'ok'; })()"
+	},
+	{
 		"feature": "hover",
 		"caption": "Hover a note to light up its links and see its name. Click it to open the note.",
 		"note": "Team graph.base",

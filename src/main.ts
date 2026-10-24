@@ -137,7 +137,7 @@ export default class BasesLinkGraphPlugin extends Plugin {
 			pos[n.id] = [Math.round(l.x[i]!), Math.round(l.y[i]!)];
 		});
 		view.config.set(KEY.layout, pos);
-		new Notice(`Saved the layout of ${g.nodes.length} notes in the base file.`);
+		new Notice(`Saved the layout of ${g.nodes.filter((n) => !n.sub).length} notes in the base file.`);
 		view.schedule(0);
 		return true;
 	}
@@ -208,7 +208,7 @@ export default class BasesLinkGraphPlugin extends Plugin {
 		for (let n = 2; this.app.vault.getAbstractFileByPath(path) && n < 1000; n++) path = `${base} ${n}.${kind}`;
 		try {
 			const file = kind === 'svg' ? await this.app.vault.create(path, toSvg(this.svgModel(view))) : await this.app.vault.createBinary(path, await this.renderPng(view));
-			new Notice(`Exported the graph of ${view.graph.nodes.length} notes to ${file.path}`);
+			new Notice(`Exported the graph of ${view.graph.nodes.filter((n) => !n.sub).length} notes to ${file.path}`);
 			return file;
 		} catch (e) {
 			console.error('Bases Link Graph: export failed', e);

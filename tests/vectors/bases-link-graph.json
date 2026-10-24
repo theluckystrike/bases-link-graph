@@ -2,7 +2,7 @@
  "slug": "bases-link-graph",
  "module": "bases-link-graph/src/graph",
  "function": "buildGraph",
- "note": "buildGraph cases: args = [rows as [{id, label, links: {path: count}, props: {propertyId: value}}], options {showOrphans, linkEdges, sharedProps, maxGroup, focus, depth}]; expected = nodes as ids in order, edges as [source, target, kind, weight, mutual] for links and [source, target, kind, weight, prop, values] for shared values, and hidden {orphans, outside} when present. Cases with a \"function\" field call that export of the same module (sizeScale, colorScale, parseNumber) with args and compare the whole result. linkCounts counts resolved reference targets and filters property cache keys.",
+ "note": "buildGraph cases: args = [rows as [{id, label, links: {path: count}, props: {propertyId: value}}], options {showOrphans, linkEdges, sharedProps, maxGroup, focus, depth}]; expected = nodes as ids in order, edges as [source, target, kind, weight, mutual] for links and [source, target, kind, weight, prop, values] for shared values, and hidden {orphans, outside} when present. Cases with a \"function\" field call that export of the same module (sizeScale, colorScale, parseNumber) with args and compare the whole result. linkCounts counts resolved reference targets and filters property cache keys. Heading mode (1.5.0): options {headings: 'linked' | 'all', chain, maxLevel}; rows carry headings [{heading, level, line}] and refs [{line, target, heading (index), block {id, line}, missing, relation}]. Expected adds parents (node index of the parent of each heading or block node, null for notes) and missing; part edges are [source, target, 'part', weight]. Function cases also cover headingLinkText, sectionAt, headingParents and headingKeys.",
  "cases": [
   {
    "name": "one link between two rows",
@@ -1712,6 +1712,2355 @@
    "expected": {
     "__proto__.md": 1,
     "constructor.md": 1
+   }
+  },
+  {
+   "name": "heading mode off: refs and headings are ignored, links give the 1.4.0 graph",
+   "args": [
+    [
+     {
+      "id": "A.md",
+      "label": "A",
+      "links": {
+       "Book.md": 1
+      },
+      "headings": [],
+      "refs": [
+       {
+        "line": 1,
+        "target": "Book.md",
+        "heading": 1
+       }
+      ]
+     },
+     {
+      "id": "Book.md",
+      "label": "Book",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Book",
+        "level": 1,
+        "line": 0
+       },
+       {
+        "heading": "Damage",
+        "level": 2,
+        "line": 2
+       },
+       {
+        "heading": "Repair",
+        "level": 2,
+        "line": 6
+       },
+       {
+        "heading": "Methods",
+        "level": 3,
+        "line": 8
+       }
+      ],
+      "refs": []
+     }
+    ],
+    {}
+   ],
+   "expected": {
+    "nodes": [
+     "A.md",
+     "Book.md"
+    ],
+    "edges": [
+     [
+      0,
+      1,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 0
+    }
+   }
+  },
+  {
+   "name": "linked: a link to a heading gives a child node of the note, and the edge goes to the child",
+   "args": [
+    [
+     {
+      "id": "A.md",
+      "label": "A",
+      "links": {},
+      "headings": [],
+      "refs": [
+       {
+        "line": 1,
+        "target": "Book.md",
+        "heading": 2
+       }
+      ]
+     },
+     {
+      "id": "Book.md",
+      "label": "Book",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Book",
+        "level": 1,
+        "line": 0
+       },
+       {
+        "heading": "Damage",
+        "level": 2,
+        "line": 2
+       },
+       {
+        "heading": "Repair",
+        "level": 2,
+        "line": 6
+       },
+       {
+        "heading": "Methods",
+        "level": 3,
+        "line": 8
+       }
+      ],
+      "refs": []
+     }
+    ],
+    {
+     "headings": "linked"
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "A.md",
+     "Book.md",
+     "Book.md#Repair"
+    ],
+    "edges": [
+     [
+      1,
+      2,
+      "part",
+      1
+     ],
+     [
+      0,
+      2,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 0
+    },
+    "parents": [
+     null,
+     null,
+     1
+    ],
+    "missing": 0
+   }
+  },
+  {
+   "name": "linked: a heading that does not exist goes to the note and is counted as missing",
+   "args": [
+    [
+     {
+      "id": "A.md",
+      "label": "A",
+      "links": {},
+      "headings": [],
+      "refs": [
+       {
+        "line": 1,
+        "target": "Book.md",
+        "missing": true
+       }
+      ]
+     },
+     {
+      "id": "Book.md",
+      "label": "Book",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Book",
+        "level": 1,
+        "line": 0
+       },
+       {
+        "heading": "Damage",
+        "level": 2,
+        "line": 2
+       },
+       {
+        "heading": "Repair",
+        "level": 2,
+        "line": 6
+       },
+       {
+        "heading": "Methods",
+        "level": 3,
+        "line": 8
+       }
+      ],
+      "refs": []
+     }
+    ],
+    {
+     "headings": "linked"
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "A.md",
+     "Book.md"
+    ],
+    "edges": [
+     [
+      0,
+      1,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 0
+    },
+    "parents": [
+     null,
+     null
+    ],
+    "missing": 1
+   }
+  },
+  {
+   "name": "linked: a heading index past the end of the headings is missing too",
+   "args": [
+    [
+     {
+      "id": "A.md",
+      "label": "A",
+      "links": {},
+      "headings": [],
+      "refs": [
+       {
+        "line": 1,
+        "target": "Book.md",
+        "heading": 9
+       }
+      ]
+     },
+     {
+      "id": "Book.md",
+      "label": "Book",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Book",
+        "level": 1,
+        "line": 0
+       },
+       {
+        "heading": "Damage",
+        "level": 2,
+        "line": 2
+       },
+       {
+        "heading": "Repair",
+        "level": 2,
+        "line": 6
+       },
+       {
+        "heading": "Methods",
+        "level": 3,
+        "line": 8
+       }
+      ],
+      "refs": []
+     }
+    ],
+    {
+     "headings": "linked"
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "A.md",
+     "Book.md"
+    ],
+    "edges": [
+     [
+      0,
+      1,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 0
+    },
+    "parents": [
+     null,
+     null
+    ],
+    "missing": 1
+   }
+  },
+  {
+   "name": "linked: two notes link to one heading, one child node with two edges",
+   "args": [
+    [
+     {
+      "id": "A.md",
+      "label": "A",
+      "links": {},
+      "headings": [],
+      "refs": [
+       {
+        "line": 1,
+        "target": "Book.md",
+        "heading": 1
+       }
+      ]
+     },
+     {
+      "id": "B.md",
+      "label": "B",
+      "links": {},
+      "headings": [],
+      "refs": [
+       {
+        "line": 3,
+        "target": "Book.md",
+        "heading": 1
+       },
+       {
+        "line": 4,
+        "target": "Book.md",
+        "heading": 1
+       }
+      ]
+     },
+     {
+      "id": "Book.md",
+      "label": "Book",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Book",
+        "level": 1,
+        "line": 0
+       },
+       {
+        "heading": "Damage",
+        "level": 2,
+        "line": 2
+       },
+       {
+        "heading": "Repair",
+        "level": 2,
+        "line": 6
+       },
+       {
+        "heading": "Methods",
+        "level": 3,
+        "line": 8
+       }
+      ],
+      "refs": []
+     }
+    ],
+    {
+     "headings": "linked"
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "A.md",
+     "B.md",
+     "Book.md",
+     "Book.md#Damage"
+    ],
+    "edges": [
+     [
+      2,
+      3,
+      "part",
+      1
+     ],
+     [
+      0,
+      3,
+      "link",
+      1,
+      false
+     ],
+     [
+      1,
+      3,
+      "link",
+      2,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 0
+    },
+    "parents": [
+     null,
+     null,
+     null,
+     2
+    ],
+    "missing": 0
+   }
+  },
+  {
+   "name": "linked: duplicate heading names get ids \"#Name\" and \"#Name [2]\"",
+   "args": [
+    [
+     {
+      "id": "A.md",
+      "label": "A",
+      "links": {},
+      "headings": [],
+      "refs": [
+       {
+        "line": 1,
+        "target": "D.md",
+        "heading": 0
+       },
+       {
+        "line": 2,
+        "target": "D.md",
+        "heading": 1
+       }
+      ]
+     },
+     {
+      "id": "D.md",
+      "label": "D",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Notes",
+        "level": 2,
+        "line": 0
+       },
+       {
+        "heading": "Notes",
+        "level": 2,
+        "line": 4
+       }
+      ],
+      "refs": []
+     }
+    ],
+    {
+     "headings": "linked"
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "A.md",
+     "D.md",
+     "D.md#Notes",
+     "D.md#Notes [2]"
+    ],
+    "edges": [
+     [
+      1,
+      2,
+      "part",
+      1
+     ],
+     [
+      1,
+      3,
+      "part",
+      1
+     ],
+     [
+      0,
+      2,
+      "link",
+      1,
+      false
+     ],
+     [
+      0,
+      3,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 0
+    },
+    "parents": [
+     null,
+     null,
+     1,
+     1
+    ],
+    "missing": 0
+   }
+  },
+  {
+   "name": "linked: a same-note link to a heading shows the heading node with only its part line",
+   "args": [
+    [
+     {
+      "id": "Book.md",
+      "label": "Book",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Book",
+        "level": 1,
+        "line": 0
+       },
+       {
+        "heading": "Damage",
+        "level": 2,
+        "line": 2
+       },
+       {
+        "heading": "Repair",
+        "level": 2,
+        "line": 6
+       },
+       {
+        "heading": "Methods",
+        "level": 3,
+        "line": 8
+       }
+      ],
+      "refs": [
+       {
+        "line": 10,
+        "target": "Book.md",
+        "heading": 1
+       }
+      ]
+     }
+    ],
+    {
+     "headings": "linked"
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "Book.md",
+     "Book.md#Damage"
+    ],
+    "edges": [
+     [
+      0,
+      1,
+      "part",
+      1
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 0
+    },
+    "parents": [
+     null,
+     0
+    ],
+    "missing": 0
+   }
+  },
+  {
+   "name": "linked: a block link gives a \"^id\" child node",
+   "args": [
+    [
+     {
+      "id": "A.md",
+      "label": "A",
+      "links": {},
+      "headings": [],
+      "refs": [
+       {
+        "line": 1,
+        "target": "Book.md",
+        "block": {
+         "id": "q1",
+         "line": 9
+        }
+       }
+      ]
+     },
+     {
+      "id": "Book.md",
+      "label": "Book",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Book",
+        "level": 1,
+        "line": 0
+       },
+       {
+        "heading": "Damage",
+        "level": 2,
+        "line": 2
+       },
+       {
+        "heading": "Repair",
+        "level": 2,
+        "line": 6
+       },
+       {
+        "heading": "Methods",
+        "level": 3,
+        "line": 8
+       }
+      ],
+      "refs": []
+     }
+    ],
+    {
+     "headings": "linked"
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "A.md",
+     "Book.md",
+     "Book.md#^q1"
+    ],
+    "edges": [
+     [
+      1,
+      2,
+      "part",
+      1
+     ],
+     [
+      0,
+      2,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 0
+    },
+    "parents": [
+     null,
+     null,
+     1
+    ],
+    "missing": 0
+   }
+  },
+  {
+   "name": "linked: links to notes outside the base give no node and no missing count",
+   "args": [
+    [
+     {
+      "id": "A.md",
+      "label": "A",
+      "links": {},
+      "headings": [],
+      "refs": [
+       {
+        "line": 1,
+        "target": "Out.md",
+        "heading": 0
+       },
+       {
+        "line": 2,
+        "target": "Out.md",
+        "missing": true
+       }
+      ]
+     },
+     {
+      "id": "Book.md",
+      "label": "Book",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Book",
+        "level": 1,
+        "line": 0
+       },
+       {
+        "heading": "Damage",
+        "level": 2,
+        "line": 2
+       },
+       {
+        "heading": "Repair",
+        "level": 2,
+        "line": 6
+       },
+       {
+        "heading": "Methods",
+        "level": 3,
+        "line": 8
+       }
+      ],
+      "refs": []
+     }
+    ],
+    {
+     "headings": "linked"
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "A.md",
+     "Book.md"
+    ],
+    "edges": [],
+    "hidden": {
+     "orphans": 0,
+     "outside": 0
+    },
+    "parents": [
+     null,
+     null
+    ],
+    "missing": 0
+   }
+  },
+  {
+   "name": "linked: a link with no subpath and a property link still go to the note",
+   "args": [
+    [
+     {
+      "id": "A.md",
+      "label": "A",
+      "links": {},
+      "headings": [],
+      "refs": [
+       {
+        "line": 1,
+        "target": "Book.md"
+       },
+       {
+        "line": null,
+        "target": "Book.md",
+        "relation": "source"
+       }
+      ]
+     },
+     {
+      "id": "Book.md",
+      "label": "Book",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Book",
+        "level": 1,
+        "line": 0
+       },
+       {
+        "heading": "Damage",
+        "level": 2,
+        "line": 2
+       },
+       {
+        "heading": "Repair",
+        "level": 2,
+        "line": 6
+       },
+       {
+        "heading": "Methods",
+        "level": 3,
+        "line": 8
+       }
+      ],
+      "refs": []
+     }
+    ],
+    {
+     "headings": "linked"
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "A.md",
+     "Book.md"
+    ],
+    "edges": [
+     [
+      0,
+      1,
+      "link",
+      2,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 0
+    },
+    "parents": [
+     null,
+     null
+    ],
+    "missing": 0
+   }
+  },
+  {
+   "name": "all: links both ways between a note and a heading node merge into one mutual edge",
+   "args": [
+    [
+     {
+      "id": "A.md",
+      "label": "A",
+      "links": {},
+      "headings": [],
+      "refs": [
+       {
+        "line": 1,
+        "target": "Book.md",
+        "heading": 1
+       }
+      ]
+     },
+     {
+      "id": "Book.md",
+      "label": "Book",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Book",
+        "level": 1,
+        "line": 0
+       },
+       {
+        "heading": "Damage",
+        "level": 2,
+        "line": 2
+       },
+       {
+        "heading": "Repair",
+        "level": 2,
+        "line": 6
+       },
+       {
+        "heading": "Methods",
+        "level": 3,
+        "line": 8
+       }
+      ],
+      "refs": [
+       {
+        "line": 3,
+        "target": "A.md"
+       }
+      ]
+     }
+    ],
+    {
+     "headings": "all"
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "A.md",
+     "Book.md",
+     "Book.md#Book",
+     "Book.md#Damage",
+     "Book.md#Repair",
+     "Book.md#Methods"
+    ],
+    "edges": [
+     [
+      1,
+      2,
+      "part",
+      1
+     ],
+     [
+      1,
+      3,
+      "part",
+      1
+     ],
+     [
+      1,
+      4,
+      "part",
+      1
+     ],
+     [
+      1,
+      5,
+      "part",
+      1
+     ],
+     [
+      0,
+      3,
+      "link",
+      2,
+      true
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 0
+    },
+    "parents": [
+     null,
+     null,
+     1,
+     1,
+     1,
+     1
+    ],
+    "missing": 0
+   }
+  },
+  {
+   "name": "all: every heading is a node and a body link starts at the heading that holds it",
+   "args": [
+    [
+     {
+      "id": "Book.md",
+      "label": "Book",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Book",
+        "level": 1,
+        "line": 0
+       },
+       {
+        "heading": "Damage",
+        "level": 2,
+        "line": 2
+       },
+       {
+        "heading": "Repair",
+        "level": 2,
+        "line": 6
+       },
+       {
+        "heading": "Methods",
+        "level": 3,
+        "line": 8
+       }
+      ],
+      "refs": [
+       {
+        "line": 4,
+        "target": "img.png"
+       },
+       {
+        "line": 10,
+        "target": "Book.md",
+        "heading": 1
+       }
+      ]
+     },
+     {
+      "id": "img.png",
+      "label": "img",
+      "links": {}
+     }
+    ],
+    {
+     "headings": "all"
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "Book.md",
+     "img.png",
+     "Book.md#Book",
+     "Book.md#Damage",
+     "Book.md#Repair",
+     "Book.md#Methods"
+    ],
+    "edges": [
+     [
+      0,
+      2,
+      "part",
+      1
+     ],
+     [
+      0,
+      3,
+      "part",
+      1
+     ],
+     [
+      0,
+      4,
+      "part",
+      1
+     ],
+     [
+      0,
+      5,
+      "part",
+      1
+     ],
+     [
+      3,
+      1,
+      "link",
+      1,
+      false
+     ],
+     [
+      5,
+      3,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 0
+    },
+    "parents": [
+     null,
+     null,
+     0,
+     0,
+     0,
+     0
+    ],
+    "missing": 0
+   }
+  },
+  {
+   "name": "all: a link above the first heading and a property link start at the note",
+   "args": [
+    [
+     {
+      "id": "A.md",
+      "label": "A",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Intro",
+        "level": 2,
+        "line": 3
+       }
+      ],
+      "refs": [
+       {
+        "line": 0,
+        "target": "Book.md"
+       },
+       {
+        "line": null,
+        "target": "Book.md",
+        "relation": "up"
+       }
+      ]
+     },
+     {
+      "id": "Book.md",
+      "label": "Book",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Book",
+        "level": 1,
+        "line": 0
+       },
+       {
+        "heading": "Damage",
+        "level": 2,
+        "line": 2
+       },
+       {
+        "heading": "Repair",
+        "level": 2,
+        "line": 6
+       },
+       {
+        "heading": "Methods",
+        "level": 3,
+        "line": 8
+       }
+      ],
+      "refs": []
+     }
+    ],
+    {
+     "headings": "all"
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "A.md",
+     "Book.md",
+     "A.md#Intro",
+     "Book.md#Book",
+     "Book.md#Damage",
+     "Book.md#Repair",
+     "Book.md#Methods"
+    ],
+    "edges": [
+     [
+      0,
+      2,
+      "part",
+      1
+     ],
+     [
+      1,
+      3,
+      "part",
+      1
+     ],
+     [
+      1,
+      4,
+      "part",
+      1
+     ],
+     [
+      1,
+      5,
+      "part",
+      1
+     ],
+     [
+      1,
+      6,
+      "part",
+      1
+     ],
+     [
+      0,
+      1,
+      "link",
+      2,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 0
+    },
+    "parents": [
+     null,
+     null,
+     0,
+     1,
+     1,
+     1,
+     1
+    ],
+    "missing": 0
+   }
+  },
+  {
+   "name": "all: links between sections of two notes",
+   "args": [
+    [
+     {
+      "id": "A.md",
+      "label": "A",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Ideas",
+        "level": 2,
+        "line": 3
+       }
+      ],
+      "refs": [
+       {
+        "line": 5,
+        "target": "Book.md",
+        "heading": 3
+       }
+      ]
+     },
+     {
+      "id": "Book.md",
+      "label": "Book",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Book",
+        "level": 1,
+        "line": 0
+       },
+       {
+        "heading": "Damage",
+        "level": 2,
+        "line": 2
+       },
+       {
+        "heading": "Repair",
+        "level": 2,
+        "line": 6
+       },
+       {
+        "heading": "Methods",
+        "level": 3,
+        "line": 8
+       }
+      ],
+      "refs": [
+       {
+        "line": 7,
+        "target": "A.md",
+        "heading": 0
+       }
+      ]
+     }
+    ],
+    {
+     "headings": "all"
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "A.md",
+     "Book.md",
+     "A.md#Ideas",
+     "Book.md#Book",
+     "Book.md#Damage",
+     "Book.md#Repair",
+     "Book.md#Methods"
+    ],
+    "edges": [
+     [
+      0,
+      2,
+      "part",
+      1
+     ],
+     [
+      1,
+      3,
+      "part",
+      1
+     ],
+     [
+      1,
+      4,
+      "part",
+      1
+     ],
+     [
+      1,
+      5,
+      "part",
+      1
+     ],
+     [
+      1,
+      6,
+      "part",
+      1
+     ],
+     [
+      2,
+      6,
+      "link",
+      1,
+      false
+     ],
+     [
+      5,
+      2,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 0
+    },
+    "parents": [
+     null,
+     null,
+     0,
+     1,
+     1,
+     1,
+     1
+    ],
+    "missing": 0
+   }
+  },
+  {
+   "name": "Pro chain: headings hang from their parent heading, a block from its heading",
+   "args": [
+    [
+     {
+      "id": "A.md",
+      "label": "A",
+      "links": {},
+      "headings": [],
+      "refs": [
+       {
+        "line": 1,
+        "target": "Book.md",
+        "block": {
+         "id": "q1",
+         "line": 9
+        }
+       }
+      ]
+     },
+     {
+      "id": "Book.md",
+      "label": "Book",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Book",
+        "level": 1,
+        "line": 0
+       },
+       {
+        "heading": "Damage",
+        "level": 2,
+        "line": 2
+       },
+       {
+        "heading": "Repair",
+        "level": 2,
+        "line": 6
+       },
+       {
+        "heading": "Methods",
+        "level": 3,
+        "line": 8
+       }
+      ],
+      "refs": []
+     }
+    ],
+    {
+     "headings": "all",
+     "chain": true
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "A.md",
+     "Book.md",
+     "Book.md#Book",
+     "Book.md#Damage",
+     "Book.md#Repair",
+     "Book.md#Methods",
+     "Book.md#^q1"
+    ],
+    "edges": [
+     [
+      1,
+      2,
+      "part",
+      1
+     ],
+     [
+      2,
+      3,
+      "part",
+      1
+     ],
+     [
+      2,
+      4,
+      "part",
+      1
+     ],
+     [
+      4,
+      5,
+      "part",
+      1
+     ],
+     [
+      5,
+      6,
+      "part",
+      1
+     ],
+     [
+      0,
+      6,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 0
+    },
+    "parents": [
+     null,
+     null,
+     1,
+     2,
+     2,
+     4,
+     5
+    ],
+    "missing": 0
+   }
+  },
+  {
+   "name": "Pro level limit 2: a level 3 heading merges into its level 2 parent",
+   "args": [
+    [
+     {
+      "id": "A.md",
+      "label": "A",
+      "links": {},
+      "headings": [],
+      "refs": [
+       {
+        "line": 1,
+        "target": "Book.md",
+        "heading": 3
+       }
+      ]
+     },
+     {
+      "id": "Book.md",
+      "label": "Book",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Book",
+        "level": 1,
+        "line": 0
+       },
+       {
+        "heading": "Damage",
+        "level": 2,
+        "line": 2
+       },
+       {
+        "heading": "Repair",
+        "level": 2,
+        "line": 6
+       },
+       {
+        "heading": "Methods",
+        "level": 3,
+        "line": 8
+       }
+      ],
+      "refs": []
+     }
+    ],
+    {
+     "headings": "linked",
+     "maxLevel": 2
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "A.md",
+     "Book.md",
+     "Book.md#Repair"
+    ],
+    "edges": [
+     [
+      1,
+      2,
+      "part",
+      1
+     ],
+     [
+      0,
+      2,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 0
+    },
+    "parents": [
+     null,
+     null,
+     1
+    ],
+    "missing": 0
+   }
+  },
+  {
+   "name": "Pro chain in linked mode: a heading without a shown parent heading hangs from the note",
+   "args": [
+    [
+     {
+      "id": "A.md",
+      "label": "A",
+      "links": {},
+      "headings": [],
+      "refs": [
+       {
+        "line": 1,
+        "target": "Book.md",
+        "heading": 3
+       },
+       {
+        "line": 2,
+        "target": "Book.md",
+        "heading": 2
+       }
+      ]
+     },
+     {
+      "id": "Book.md",
+      "label": "Book",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Book",
+        "level": 1,
+        "line": 0
+       },
+       {
+        "heading": "Damage",
+        "level": 2,
+        "line": 2
+       },
+       {
+        "heading": "Repair",
+        "level": 2,
+        "line": 6
+       },
+       {
+        "heading": "Methods",
+        "level": 3,
+        "line": 8
+       }
+      ],
+      "refs": []
+     }
+    ],
+    {
+     "headings": "linked",
+     "chain": true
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "A.md",
+     "Book.md",
+     "Book.md#Repair",
+     "Book.md#Methods"
+    ],
+    "edges": [
+     [
+      1,
+      2,
+      "part",
+      1
+     ],
+     [
+      2,
+      3,
+      "part",
+      1
+     ],
+     [
+      0,
+      3,
+      "link",
+      1,
+      false
+     ],
+     [
+      0,
+      2,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 0
+    },
+    "parents": [
+     null,
+     null,
+     1,
+     2
+    ],
+    "missing": 0
+   }
+  },
+  {
+   "name": "all with notes without links hidden: a note with headings but no links is hidden with its headings",
+   "args": [
+    [
+     {
+      "id": "A.md",
+      "label": "A",
+      "links": {},
+      "headings": [],
+      "refs": [
+       {
+        "line": 1,
+        "target": "Book.md",
+        "heading": 1
+       }
+      ]
+     },
+     {
+      "id": "Book.md",
+      "label": "Book",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Book",
+        "level": 1,
+        "line": 0
+       },
+       {
+        "heading": "Damage",
+        "level": 2,
+        "line": 2
+       },
+       {
+        "heading": "Repair",
+        "level": 2,
+        "line": 6
+       },
+       {
+        "heading": "Methods",
+        "level": 3,
+        "line": 8
+       }
+      ],
+      "refs": []
+     },
+     {
+      "id": "C.md",
+      "label": "C",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Lonely",
+        "level": 1,
+        "line": 0
+       }
+      ],
+      "refs": []
+     }
+    ],
+    {
+     "headings": "all",
+     "showOrphans": false
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "A.md",
+     "Book.md",
+     "Book.md#Book",
+     "Book.md#Damage",
+     "Book.md#Repair",
+     "Book.md#Methods"
+    ],
+    "edges": [
+     [
+      1,
+      2,
+      "part",
+      1
+     ],
+     [
+      1,
+      3,
+      "part",
+      1
+     ],
+     [
+      1,
+      4,
+      "part",
+      1
+     ],
+     [
+      1,
+      5,
+      "part",
+      1
+     ],
+     [
+      0,
+      3,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 1,
+     "outside": 0
+    },
+    "parents": [
+     null,
+     null,
+     1,
+     1,
+     1,
+     1
+    ],
+    "missing": 0
+   }
+  },
+  {
+   "name": "Pro local depth 1 from A keeps the heading node and its note",
+   "args": [
+    [
+     {
+      "id": "A.md",
+      "label": "A",
+      "links": {},
+      "headings": [],
+      "refs": [
+       {
+        "line": 1,
+        "target": "Book.md",
+        "heading": 2
+       }
+      ]
+     },
+     {
+      "id": "Book.md",
+      "label": "Book",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Book",
+        "level": 1,
+        "line": 0
+       },
+       {
+        "heading": "Damage",
+        "level": 2,
+        "line": 2
+       },
+       {
+        "heading": "Repair",
+        "level": 2,
+        "line": 6
+       },
+       {
+        "heading": "Methods",
+        "level": 3,
+        "line": 8
+       }
+      ],
+      "refs": [
+       {
+        "line": 3,
+        "target": "E.md"
+       }
+      ]
+     },
+     {
+      "id": "E.md",
+      "label": "E",
+      "links": {},
+      "headings": [],
+      "refs": []
+     }
+    ],
+    {
+     "headings": "linked",
+     "focus": "A.md",
+     "depth": 1
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "A.md",
+     "Book.md",
+     "Book.md#Repair"
+    ],
+    "edges": [
+     [
+      1,
+      2,
+      "part",
+      1
+     ],
+     [
+      0,
+      2,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 1
+    },
+    "parents": [
+     null,
+     null,
+     1
+    ],
+    "missing": 0
+   }
+  },
+  {
+   "name": "level limit is clamped to 1..6 and a bad value gives 6",
+   "args": [
+    [
+     {
+      "id": "A.md",
+      "label": "A",
+      "links": {},
+      "headings": [],
+      "refs": [
+       {
+        "line": 1,
+        "target": "Book.md",
+        "heading": 3
+       }
+      ]
+     },
+     {
+      "id": "Book.md",
+      "label": "Book",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Book",
+        "level": 1,
+        "line": 0
+       },
+       {
+        "heading": "Damage",
+        "level": 2,
+        "line": 2
+       },
+       {
+        "heading": "Repair",
+        "level": 2,
+        "line": 6
+       },
+       {
+        "heading": "Methods",
+        "level": 3,
+        "line": 8
+       }
+      ],
+      "refs": []
+     }
+    ],
+    {
+     "headings": "linked",
+     "maxLevel": 99
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "A.md",
+     "Book.md",
+     "Book.md#Methods"
+    ],
+    "edges": [
+     [
+      1,
+      2,
+      "part",
+      1
+     ],
+     [
+      0,
+      2,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 0
+    },
+    "parents": [
+     null,
+     null,
+     1
+    ],
+    "missing": 0
+   }
+  },
+  {
+   "name": "headingLinkText: # in a heading becomes a space, as Obsidian writes the link",
+   "function": "headingLinkText",
+   "args": [
+    "C# basics"
+   ],
+   "expected": "C basics"
+  },
+  {
+   "name": "headingLinkText: | ^ : [ ] are removed and spaces collapse",
+   "function": "headingLinkText",
+   "args": [
+    "Q: [draft] a|b ^x"
+   ],
+   "expected": "Q draft a b x"
+  },
+  {
+   "name": "headingLinkText: plain text and other symbols stay",
+   "function": "headingLinkText",
+   "args": [
+    "Été & co. (2026)?"
+   ],
+   "expected": "Été & co. (2026)?"
+  },
+  {
+   "name": "sectionAt: a line before the first heading gives -1",
+   "function": "sectionAt",
+   "args": [
+    [
+     {
+      "heading": "A",
+      "level": 1,
+      "line": 2
+     },
+     {
+      "heading": "B",
+      "level": 2,
+      "line": 5
+     }
+    ],
+    1
+   ],
+   "expected": -1
+  },
+  {
+   "name": "sectionAt: the heading line itself and lines below belong to that heading",
+   "function": "sectionAt",
+   "args": [
+    [
+     {
+      "heading": "A",
+      "level": 1,
+      "line": 2
+     },
+     {
+      "heading": "B",
+      "level": 2,
+      "line": 5
+     }
+    ],
+    5
+   ],
+   "expected": 1
+  },
+  {
+   "name": "sectionAt: a line after the last heading",
+   "function": "sectionAt",
+   "args": [
+    [
+     {
+      "heading": "A",
+      "level": 1,
+      "line": 2
+     },
+     {
+      "heading": "B",
+      "level": 2,
+      "line": 5
+     }
+    ],
+    99
+   ],
+   "expected": 1
+  },
+  {
+   "name": "headingParents: nearest heading above with a lower level",
+   "function": "headingParents",
+   "args": [
+    [
+     {
+      "heading": "A",
+      "level": 1,
+      "line": 0
+     },
+     {
+      "heading": "B",
+      "level": 2,
+      "line": 1
+     },
+     {
+      "heading": "C",
+      "level": 3,
+      "line": 2
+     },
+     {
+      "heading": "D",
+      "level": 2,
+      "line": 3
+     },
+     {
+      "heading": "E",
+      "level": 1,
+      "line": 4
+     },
+     {
+      "heading": "F",
+      "level": 3,
+      "line": 5
+     }
+    ]
+   ],
+   "expected": [
+    -1,
+    0,
+    1,
+    0,
+    -1,
+    4
+   ]
+  },
+  {
+   "name": "headingKeys: duplicates get a number",
+   "function": "headingKeys",
+   "args": [
+    [
+     {
+      "heading": "Notes",
+      "level": 2,
+      "line": 0
+     },
+     {
+      "heading": "Other",
+      "level": 2,
+      "line": 1
+     },
+     {
+      "heading": "Notes",
+      "level": 3,
+      "line": 2
+     },
+     {
+      "heading": "Notes",
+      "level": 2,
+      "line": 3
+     }
+    ]
+   ],
+   "expected": [
+    "#Notes",
+    "#Other",
+    "#Notes [2]",
+    "#Notes [3]"
+   ]
+  },
+  {
+   "name": "Pro local depth, all mode: a link from a heading of A is one hop from A",
+   "args": [
+    [
+     {
+      "id": "A.md",
+      "label": "A",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Intro",
+        "level": 2,
+        "line": 2
+       }
+      ],
+      "refs": [
+       {
+        "line": 3,
+        "target": "B.md"
+       }
+      ]
+     },
+     {
+      "id": "B.md",
+      "label": "B",
+      "links": {},
+      "headings": [],
+      "refs": [
+       {
+        "line": 0,
+        "target": "C.md"
+       }
+      ]
+     },
+     {
+      "id": "C.md",
+      "label": "C",
+      "links": {},
+      "headings": [],
+      "refs": []
+     }
+    ],
+    {
+     "headings": "all",
+     "focus": "A.md",
+     "depth": 1
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "A.md",
+     "B.md",
+     "A.md#Intro"
+    ],
+    "edges": [
+     [
+      0,
+      2,
+      "part",
+      1
+     ],
+     [
+      2,
+      1,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 1
+    },
+    "parents": [
+     null,
+     null,
+     0
+    ],
+    "missing": 0
+   }
+  },
+  {
+   "name": "Pro local depth, linked mode: a note that links to a heading of A is one hop from A",
+   "args": [
+    [
+     {
+      "id": "A.md",
+      "label": "A",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Intro",
+        "level": 2,
+        "line": 2
+       }
+      ],
+      "refs": []
+     },
+     {
+      "id": "D.md",
+      "label": "D",
+      "links": {},
+      "headings": [],
+      "refs": [
+       {
+        "line": 1,
+        "target": "A.md",
+        "heading": 0
+       },
+       {
+        "line": 2,
+        "target": "E.md"
+       }
+      ]
+     },
+     {
+      "id": "E.md",
+      "label": "E",
+      "links": {},
+      "headings": [],
+      "refs": []
+     }
+    ],
+    {
+     "headings": "linked",
+     "focus": "A.md",
+     "depth": 1
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "A.md",
+     "D.md",
+     "A.md#Intro"
+    ],
+    "edges": [
+     [
+      0,
+      2,
+      "part",
+      1
+     ],
+     [
+      1,
+      2,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 1
+    },
+    "parents": [
+     null,
+     null,
+     0
+    ],
+    "missing": 0
+   }
+  },
+  {
+   "name": "Pro local depth 2, all mode: two hops through heading nodes of both notes",
+   "args": [
+    [
+     {
+      "id": "A.md",
+      "label": "A",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Intro",
+        "level": 2,
+        "line": 2
+       }
+      ],
+      "refs": [
+       {
+        "line": 3,
+        "target": "B.md",
+        "heading": 0
+       }
+      ]
+     },
+     {
+      "id": "B.md",
+      "label": "B",
+      "links": {},
+      "headings": [
+       {
+        "heading": "Plan",
+        "level": 2,
+        "line": 4
+       }
+      ],
+      "refs": [
+       {
+        "line": 5,
+        "target": "C.md"
+       }
+      ]
+     },
+     {
+      "id": "C.md",
+      "label": "C",
+      "links": {},
+      "headings": [],
+      "refs": [
+       {
+        "line": 1,
+        "target": "X.md"
+       }
+      ]
+     },
+     {
+      "id": "X.md",
+      "label": "X",
+      "links": {},
+      "headings": [],
+      "refs": []
+     }
+    ],
+    {
+     "headings": "all",
+     "focus": "A.md",
+     "depth": 2
+    }
+   ],
+   "expected": {
+    "nodes": [
+     "A.md",
+     "B.md",
+     "C.md",
+     "A.md#Intro",
+     "B.md#Plan"
+    ],
+    "edges": [
+     [
+      0,
+      3,
+      "part",
+      1
+     ],
+     [
+      1,
+      4,
+      "part",
+      1
+     ],
+     [
+      3,
+      4,
+      "link",
+      1,
+      false
+     ],
+     [
+      4,
+      2,
+      "link",
+      1,
+      false
+     ]
+    ],
+    "hidden": {
+     "orphans": 0,
+     "outside": 1
+    },
+    "parents": [
+     null,
+     null,
+     null,
+     0,
+     1
+    ],
+    "missing": 0
    }
   }
  ]

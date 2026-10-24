@@ -55,8 +55,9 @@ describe('view options', () => {
 	it('free options first, Pro options in one group, no reserved Bases keys', () => {
 		const opts = viewOptions({} as never);
 		const keys = opts.flatMap((o) => ('items' in o ? o.items.map((i) => i.key) : [o.key]));
-		expect(keys).toEqual([KEY.labels, KEY.orphans, KEY.spacing, KEY.linkSource, KEY.linkProperties, KEY.arrows, KEY.sizeBy, KEY.colorBy, KEY.shared, KEY.depth, KEY.linkColors]);
-		expect(opts[6]).toMatchObject({ type: 'group', displayName: 'Pro' });
+		expect(keys).toEqual([KEY.labels, KEY.orphans, KEY.spacing, KEY.linkSource, KEY.linkProperties, KEY.arrows, KEY.headings, KEY.sizeBy, KEY.colorBy, KEY.shared, KEY.depth, KEY.linkColors, KEY.headingChain, KEY.headingLevel]);
+		expect(opts[7]).toMatchObject({ type: 'group', displayName: 'Pro' });
+		expect(opts[6]).toMatchObject({ type: 'dropdown', key: KEY.headings, displayName: 'Headings and blocks', default: 'off' });
 		expect(opts[5]).toMatchObject({ type: 'toggle', key: KEY.arrows, displayName: 'Show arrows', default: false });
 		for (const k of keys) expect(['groupBy', 'order', 'sort', 'filters', 'summaries', 'name', 'type']).not.toContain(k);
 	});

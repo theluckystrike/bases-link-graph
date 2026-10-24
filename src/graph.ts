@@ -14,6 +14,11 @@ export interface ResolvedReference {
 	key?: string;
 }
 
+/** True when a property cache key ("parent", "parent.0", "parent,0") belongs to one of the property names. */
+export function keyMatches(key: string | undefined, names: string[]): boolean {
+	return names.some((p) => key === p || key?.startsWith(`${p}.`) || key?.startsWith(`${p},`));
+}
+
 /** Count resolved references, with an optional filter for frontmatter property names. */
 export function linkCounts(refs: ResolvedReference[], properties: string[] = []): Record<string, number> {
 	const names = properties.map((p) => p.trim().replace(/^note\./, '')).filter(Boolean);
@@ -66,12 +71,44 @@ export interface NodeInput {
 	props?: Record<string, PropValue>;
 	/** Target path -> relation names of the links to it (see `linkRelations`). Optional. */
 	relations?: Record<string, string[]>;
+	/** Heading mode: the headings of the note in file order (from the metadata cache). */
+	headings?: HeadingInput[];
+	/** Heading mode: one entry per link, embed or property link of the note, resolved by the view. */
+	refs?: SectionRef[];
 }
+
+/** A heading of a note: its text, level 1 to 6 and 0-based line. */
+export interface HeadingInput {
+	heading: string;
+	level: number;
+	line: number;
+}
+
+/** One reference of a note in heading mode. The view resolves the target note and its subpath. */
+export interface SectionRef {
+	/** 0-based line of the link in the source note. Null for a property link. */
+	line: number | null;
+	/** Vault path of the target note. */
+	target: string;
+	/** Index of the target heading in the `headings` of the target row. */
+	heading?: number | null;
+	/** The target block: its id and line. */
+	block?: { id: string; line: number } | null;
+	/** True when the link has a subpath that does not resolve. The link then goes to the note. */
+	missing?: boolean;
+	/** Relation name: the property name, or "body". */
+	relation?: string;
+}
+
+/** Off = the 1.4.0 graph. Linked = headings and blocks that links point to. All = every heading of each note. */
+export type HeadingMode = 'off' | 'linked' | 'all';
 
 /** One relation of a link edge: its name and the row index of the note that links. */
 export interface Relation {
 	name: string;
 	from: number;
+	/** Heading mode: index of the node that links (a note, heading or block node). */
+	node?: number;
 }
 
 export interface GraphOptions {
@@ -86,20 +123,42 @@ export interface GraphOptions {
 	/** Pro: keep only rows within `depth` edges of this row id. */
 	focus?: string | null;
 	depth?: number;
+	/** Headings and blocks as child nodes. Default off. */
+	headings?: HeadingMode;
+	/** Pro: a heading hangs from its parent heading and a block from its heading, not from the note. */
+	chain?: boolean;
+	/** Pro: deepest heading level shown, 1 to 6. A deeper heading merges into its nearest shown parent. */
+	maxLevel?: number;
+}
+
+/** A heading or block node: what it is and the node index of its parent (the note, or a heading with chain on). */
+export interface SubInfo {
+	kind: 'heading' | 'block';
+	/** Heading text, or the block id without the caret. */
+	name: string;
+	/** Heading level 1 to 6; 0 for a block. */
+	level: number;
+	line: number;
+	parent: number;
+	/** Heading nodes: the heading texts from the top parent heading down to this one, for a nested link subpath. */
+	trail?: string[];
 }
 
 export interface GraphNode {
 	id: string;
 	label: string;
-	/** Index of the row in the input. */
+	/** Index of the row in the input. A heading or block node has the row of its note. */
 	row: number;
 	degree: number;
+	/** Only on heading and block nodes. */
+	sub?: SubInfo;
 }
 
 export interface Edge {
 	source: number;
 	target: number;
-	kind: 'link' | 'shared';
+	/** part = the line from a note (or a parent heading) to a heading or block node. */
+	kind: 'link' | 'shared' | 'part';
 	/** Number of links (both ways) or number of shared values. */
 	weight: number;
 	/** Link edges: true when both notes link to each other. */
@@ -116,6 +175,8 @@ export interface Graph {
 	edges: Edge[];
 	/** Rows left out: orphans hidden by showOrphans false, rows outside the local depth. */
 	hidden: { orphans: number; outside: number };
+	/** Heading mode: links to rows of the base whose heading or block does not exist. They go to the note. */
+	missing?: number;
 }
 
 export const DEFAULT_MAX_GROUP = 12;
@@ -171,6 +232,7 @@ function linkEdges(rows: NodeInput[], index: Map<string, number>): Edge[] {
 
 /** Ends of an edge that get an arrowhead: the target of a link, both ends of a mutual link, none for shared values. */
 export function arrowEnds(e: Edge): ('source' | 'target')[] {
+	// Part lines (note to heading) and shared values have no direction.
 	if (e.kind !== 'link') return [];
 	return e.mutual ? ['source', 'target'] : ['target'];
 }
@@ -258,6 +320,7 @@ export function buildGraph(input: NodeInput[], opts: GraphOptions = {}): Graph {
 		index.set(r.id, rows.length);
 		rows.push(r);
 	}
+	if (opts.headings === 'linked' || opts.headings === 'all') return buildSectionGraph(rows, index, opts, opts.headings);
 	const maxGroup = Math.max(2, Math.floor(opts.maxGroup ?? DEFAULT_MAX_GROUP));
 	let edges = [...(opts.linkEdges === false ? [] : linkEdges(rows, index)), ...sharedEdges(rows, opts.sharedProps ?? [], maxGroup)];
 	let keep: Set<number> | null = null;
@@ -288,6 +351,249 @@ export function buildGraph(input: NodeInput[], opts: GraphOptions = {}): Graph {
 	});
 	const out = edges.filter((e) => map.has(e.source) && map.has(e.target)).map((e) => ({ ...e, source: map.get(e.source)!, target: map.get(e.target)! }));
 	return { nodes, edges: out, hidden: { orphans, outside } };
+}
+
+/** Index of the heading that holds `line`: the last heading at or above it. -1 before the first heading. */
+export function sectionAt(headings: HeadingInput[], line: number): number {
+	let lo = 0;
+	let hi = headings.length - 1;
+	let found = -1;
+	// Headings are in file order, so a binary search finds the last one at or above the line.
+	while (lo <= hi) {
+		const mid = (lo + hi) >> 1;
+		if (headings[mid]!.line <= line) {
+			found = mid;
+			lo = mid + 1;
+		} else hi = mid - 1;
+	}
+	return found;
+}
+
+/** Parent heading of each heading: the nearest heading above it with a lower level, or -1. */
+export function headingParents(headings: HeadingInput[]): number[] {
+	const out: number[] = [];
+	const stack: number[] = [];
+	headings.forEach((h, i) => {
+		while (stack.length > 0 && headings[stack[stack.length - 1]!]!.level >= h.level) stack.pop();
+		out.push(stack.length > 0 ? stack[stack.length - 1]! : -1);
+		stack.push(i);
+	});
+	return out;
+}
+
+/** Node id suffix of each heading: "#Name", then "#Name [2]" for the second heading with the same text. */
+export function headingKeys(headings: HeadingInput[]): string[] {
+	const seen = new Map<string, number>();
+	return headings.map((h) => {
+		const n = (seen.get(h.heading) ?? 0) + 1;
+		seen.set(h.heading, n);
+		return n === 1 ? `#${h.heading}` : `#${h.heading} [${n}]`;
+	});
+}
+
+/**
+ * Subpath for a link to this heading, as Obsidian writes it: the characters # | ^ : % [ ] \\ become spaces.
+ * Obsidian matches the heading "C# basics" from the link text "C basics".
+ */
+export function headingLinkText(heading: string): string {
+	return heading.replace(/[#|^:%[\]\\]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+interface Unit {
+	id: string;
+	label: string;
+	row: number;
+	/** Index of the heading in its note. */
+	h?: number;
+	sub?: SubInfo;
+}
+
+/** Heading mode of buildGraph: notes first in row order, then the heading and block nodes of each note in line order. */
+function buildSectionGraph(rows: NodeInput[], index: Map<string, number>, opts: GraphOptions, mode: 'linked' | 'all'): Graph {
+	const maxLevel = Math.min(6, Math.max(1, Math.floor(opts.maxLevel ?? 6)));
+	const chain = opts.chain === true;
+	const heads = rows.map((r) => r.headings ?? []);
+	const parents = heads.map(headingParents);
+	const keys = heads.map(headingKeys);
+	/** The heading itself, or its nearest parent within the level limit; -1 when there is none. */
+	const within = (row: number, h: number): number => {
+		let k = h;
+		while (k >= 0 && heads[row]![k]!.level > maxLevel) k = parents[row]![k]!;
+		return k;
+	};
+	// 1. Targets: the headings and blocks that links point to.
+	const linkedHeads = rows.map(() => new Set<number>());
+	const linkedBlocks = rows.map(() => new Map<string, number>());
+	let missing = 0;
+	interface Ref {
+		from: number;
+		ref: SectionRef;
+		to: number;
+		/** Number of links: 1 for a ref, the count for a row that has only `links`. */
+		n: number;
+	}
+	const refs: Ref[] = [];
+	rows.forEach((row, i) => {
+		// A row without refs (for example from an old caller) links at note level with its link counts.
+		const list: [SectionRef, number][] = row.refs
+			? row.refs.map((r): [SectionRef, number] => [r, 1])
+			: Object.entries(row.links).flatMap(([target, count]): [SectionRef, number][] => (count > 0 ? [[{ line: null, target, relation: row.relations?.[target]?.[0] }, count]] : []));
+		for (const [ref, n] of list) {
+			const j = index.get(ref.target);
+			if (j === undefined) continue;
+			if (ref.missing) missing++;
+			if (typeof ref.heading === 'number') {
+				if (heads[j]![ref.heading] === undefined) {
+					missing++;
+				} else {
+					const h = within(j, ref.heading);
+					if (h >= 0) linkedHeads[j]!.add(h);
+				}
+			} else if (ref.block && ref.block.id) linkedBlocks[j]!.set(ref.block.id, ref.block.line);
+			refs.push({ from: i, ref, to: j, n });
+		}
+	});
+	// 2. Units: the notes, then the shown headings and blocks of each note.
+	const units: Unit[] = rows.map((r, i) => ({ id: r.id, label: r.label, row: i }));
+	const headUnit = rows.map(() => new Map<number, number>());
+	const blockUnit = rows.map(() => new Map<string, number>());
+	rows.forEach((r, i) => {
+		const shown: { line: number; order: number; h?: number; block?: string }[] = [];
+		heads[i]!.forEach((h, k) => {
+			if (mode === 'all' ? h.level <= maxLevel : linkedHeads[i]!.has(k)) shown.push({ line: h.line, order: 0, h: k });
+		});
+		for (const [id, line] of linkedBlocks[i]!) shown.push({ line, order: 1, block: id });
+		shown.sort((a, b) => a.line - b.line || a.order - b.order || byText(a.block ?? '', b.block ?? ''));
+		for (const s of shown) {
+			if (s.h !== undefined) {
+				const h = heads[i]![s.h]!;
+				headUnit[i]!.set(s.h, units.length);
+				const trail: string[] = [];
+				for (let k = s.h; k >= 0; k = parents[i]![k]!) trail.unshift(heads[i]![k]!.heading);
+				units.push({ id: `${r.id}${keys[i]![s.h]}`, label: h.heading, row: i, h: s.h, sub: { kind: 'heading', name: h.heading, level: h.level, line: h.line, parent: i, trail } });
+			} else {
+				blockUnit[i]!.set(s.block!, units.length);
+				units.push({ id: `${r.id}#^${s.block}`, label: `^${s.block}`, row: i, sub: { kind: 'block', name: s.block!, level: 0, line: s.line, parent: i } });
+			}
+		}
+	});
+	/** Unit of the nearest shown heading at or above heading h (through parents), or the note. */
+	const shownHead = (row: number, h: number): number => {
+		for (let k = within(row, h); k >= 0; k = within(row, parents[row]![k]!)) {
+			const u = headUnit[row]!.get(k);
+			if (u !== undefined) return u;
+			if (parents[row]![k]! < 0) break;
+		}
+		return row;
+	};
+	// Parents: the note, or with chain on the nearest shown parent heading (for a block, the heading that holds it).
+	if (chain) {
+		for (const u of units) {
+			if (!u.sub) continue;
+			const hs = heads[u.row]!;
+			if (u.sub.kind === 'heading') {
+				const p = parents[u.row]![u.h!]!;
+				u.sub.parent = p >= 0 ? shownHead(u.row, p) : u.row;
+			} else {
+				const s = sectionAt(hs, u.sub.line);
+				u.sub.parent = s >= 0 ? shownHead(u.row, s) : u.row;
+			}
+		}
+	}
+	// 3. Part edges, then link edges between units.
+	const edges: Edge[] = [];
+	const partPairs = new Set<string>();
+	units.forEach((u, k) => {
+		if (!u.sub) return;
+		edges.push({ source: u.sub.parent, target: k, kind: 'part', weight: 1 });
+		partPairs.add(pairKey(u.sub.parent, k));
+	});
+	const byPair = new Map<string, Edge>();
+	for (const { from, ref, to, n } of refs) {
+		let src = from;
+		if (mode === 'all' && ref.line !== null) {
+			const s = sectionAt(heads[from]!, ref.line);
+			if (s >= 0) src = shownHead(from, s);
+		}
+		let tgt = to;
+		if (typeof ref.heading === 'number' && heads[to]![ref.heading] !== undefined) tgt = shownHead(to, ref.heading);
+		else if (ref.block && ref.block.id) tgt = blockUnit[to]!.get(ref.block.id) ?? to;
+		const key = pairKey(src, tgt);
+		if (src === tgt || partPairs.has(key)) continue;
+		let e = byPair.get(key);
+		if (!e) {
+			e = { source: src, target: tgt, kind: 'link', weight: n, mutual: false, relations: [] };
+			byPair.set(key, e);
+		} else {
+			e.weight += n;
+			if (e.source === tgt) e.mutual = true;
+		}
+		e.relations!.push({ name: ref.relation ?? BODY_RELATION, from, node: src });
+	}
+	for (const e of byPair.values()) {
+		e.relations = [...new Map(e.relations!.map((r) => [JSON.stringify([r.name, r.node]), r])).values()];
+		e.relations.sort((a, b) => byText(a.name, b.name) || a.from - b.from || a.node! - b.node!);
+		edges.push(e);
+	}
+	const maxGroup = Math.max(2, Math.floor(opts.maxGroup ?? DEFAULT_MAX_GROUP));
+	// Shared values join notes; notes are the first units, so row indices are unit indices.
+	edges.push(...sharedEdges(rows, opts.sharedProps ?? [], maxGroup));
+	// 4. Local depth counts notes: a note and its heading and block nodes are one node, and part lines are no hop.
+	let keep: Set<number> | null = null;
+	let outside = 0;
+	const focus = opts.focus ? index.get(opts.focus) : undefined;
+	const depth = Math.min(MAX_DEPTH, Math.max(0, Math.floor(opts.depth ?? 0)));
+	let kept = edges;
+	if (focus !== undefined && depth > 0) {
+		const noteEdges: Edge[] = [];
+		for (const e of edges) {
+			const a = units[e.source]!.row;
+			const b = units[e.target]!.row;
+			if (e.kind !== 'part' && a !== b) noteEdges.push({ ...e, source: a, target: b });
+		}
+		const near = withinDepth(rows.length, noteEdges, focus, depth);
+		keep = new Set(units.flatMap((u, k) => (near.has(u.row) ? [k] : [])));
+		outside = rows.length - near.size;
+		kept = edges.filter((e) => keep!.has(e.source) && keep!.has(e.target));
+	}
+	// 5. A note without links: no link or shared edge on the note or on its heading and block nodes.
+	const linked = new Array<boolean>(rows.length).fill(false);
+	// Degree counts link and shared edges only, so the default node size follows links, not headings. A link to
+	// or from a heading node also counts for its note.
+	const degree = new Array<number>(units.length).fill(0);
+	for (const e of kept) {
+		if (e.kind !== 'part') {
+			for (const k of [e.source, e.target]) {
+				degree[k]!++;
+				if (units[k]!.sub) degree[units[k]!.row]!++;
+			}
+			linked[units[e.source]!.row] = true;
+			linked[units[e.target]!.row] = true;
+		}
+	}
+	let orphans = 0;
+	const map = new Map<number, number>();
+	const nodes: GraphNode[] = [];
+	units.forEach((u, k) => {
+		if (keep && !keep.has(k)) return;
+		if (opts.showOrphans === false && !linked[u.row]) {
+			if (!u.sub) orphans++;
+			return;
+		}
+		map.set(k, nodes.length);
+		const node: GraphNode = { id: u.id, label: u.label, row: u.row, degree: degree[k]! };
+		if (u.sub) node.sub = { ...u.sub };
+		nodes.push(node);
+	});
+	for (const n of nodes) if (n.sub) n.sub.parent = map.get(n.sub.parent) ?? -1;
+	const out = kept
+		.filter((e) => map.has(e.source) && map.has(e.target))
+		.map((e) => {
+			const c: Edge = { ...e, source: map.get(e.source)!, target: map.get(e.target)! };
+			if (e.relations) c.relations = e.relations.map((r) => ({ ...r, node: map.get(r.node!) ?? -1 }));
+			return c;
+		});
+	return { nodes, edges: out, hidden: { orphans, outside }, missing };
 }
 
 /**

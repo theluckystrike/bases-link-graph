@@ -67,8 +67,8 @@ export class BasesLinkGraphSettingTab extends PluginSettingTab {
 			{
 				name: 'Pro features',
 				desc: isPro()
-					? 'Pro is on: size and color by a property, edges from shared values, local depth, export to PNG or SVG, and saved layouts.'
-					: 'Free version: the graph of the notes in a base with link edges, labels, zoom, pan, drag, click to open and hover preview. Pro adds size and color by a property with a legend, edges from shared values, local depth, export to PNG or SVG, and saved layouts.',
+					? 'Pro is on: size and color by a property, link colors, nested headings with a level limit, edges from shared values, local depth, export to PNG or SVG, and saved layouts.'
+					: 'Free version: the graph of the notes in a base with link edges, headings and blocks as nodes, labels, zoom, pan, drag, click to open and hover preview. Pro adds size and color by a property with a legend, link colors, nested headings with a level limit, edges from shared values, local depth, export to PNG or SVG, and saved layouts.',
 			},
 		];
 	}

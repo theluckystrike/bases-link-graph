@@ -1,5 +1,5 @@
-import { BasesView, BooleanValue, NumberValue, StringValue, Keymap, Menu, Notice, parseLinktext, setIcon, type BasesAllOptions, type BasesPropertyId, type BasesViewConfig, type HoverParent, type HoverPopover, type MetadataCache, type QueryController, type TFile } from 'obsidian';
-import { arrowEnds, arrowHead, arrowSize, buildGraph, colorScale, linkCounts, linkRelations, parseNumber, relationColors, sizeScale, type ColorResult, type Graph, type LinkSource, type NodeInput, type PropValue, type ResolvedReference } from './graph';
+import { BasesView, BooleanValue, NumberValue, StringValue, Keymap, MarkdownView, Menu, Notice, parseLinktext, resolveSubpath, setIcon, type BasesAllOptions, type BasesPropertyId, type BasesViewConfig, type HoverParent, type HoverPopover, type MetadataCache, type QueryController, type TFile } from 'obsidian';
+import { arrowEnds, arrowHead, arrowSize, buildGraph, colorScale, headingLinkText, keyMatches, linkCounts, linkRelations, parseNumber, relationColors, relationName, sizeScale, type ColorResult, type Graph, type HeadingInput, type HeadingMode, type LinkSource, type NodeInput, type PropValue, type ResolvedReference, type SectionRef } from './graph';
 import { bounds, createLayout, hitTest, reheat, run, tick, type LayoutState } from './layout';
 import { isPro, onProChange } from './pro';
 import { readTheme, type Theme } from './theme';
@@ -21,7 +21,13 @@ export const KEY = {
 	layout: 'graphLayout',
 	arrows: 'graphArrows',
 	linkColors: 'graphLinkColors',
+	headings: 'graphHeadings',
+	headingChain: 'graphHeadingChain',
+	headingLevel: 'graphHeadingLevel',
 } as const;
+
+/** Radius of a heading node in layout units; a block node is half a unit smaller. */
+export const SUB_RADIUS = 3.5;
 
 /** Most relation lines in the hover card; the rest show as "+N more". */
 export const TIP_RELATIONS = 8;
@@ -38,6 +44,12 @@ export interface ViewOptions {
 	arrows: boolean;
 	/** Pro: link edges colored by their relation, with a "Links" legend. */
 	linkColors: boolean;
+	/** Free: headings and blocks as child nodes. */
+	headings: HeadingMode;
+	/** Pro: headings hang from their parent heading. */
+	headingChain: boolean;
+	/** Pro: deepest heading level shown (6 = all). */
+	headingLevel: number;
 	sizeBy: BasesPropertyId | null;
 	colorBy: BasesPropertyId | null;
 	shared: BasesPropertyId[];
@@ -97,6 +109,8 @@ interface Pointer {
 	startY: number;
 	moved: boolean;
 	wasFixed: boolean;
+	/** The node that a drag moves: the node itself, or the note of a heading or block node. */
+	drag: number;
 }
 
 /** Resolve links through the public metadata cache, with the source note as context. */
@@ -121,6 +135,48 @@ export function relationsForFile(cache: MetadataCache, file: TFile, source: Link
 	if (source !== 'body') for (const ref of meta?.frontmatterLinks ?? []) refs.push({ target: resolve(ref.link), key: ref.key });
 	if (source !== 'frontmatter') for (const ref of [...(meta?.links ?? []), ...(meta?.embeds ?? [])]) refs.push({ target: resolve(ref.link) });
 	return linkRelations(refs, source === 'frontmatter' ? properties : []);
+}
+
+/** The headings of a note in file order, from the metadata cache. */
+export function headingsForFile(cache: MetadataCache, file: TFile): HeadingInput[] {
+	return (cache.getFileCache(file)?.headings ?? []).map((h) => ({ heading: h.heading, level: h.level, line: h.position.start.line }));
+}
+
+/**
+ * Heading mode: one entry per reference of the note, with the same link source and property filter as the edges.
+ * Obsidian resolves the subpath, so "C basics" finds the heading "C# basics" and "A#B" finds B under A.
+ * A link with no file part ("[[#Heading]]") points to the note itself. Unresolved notes are skipped.
+ */
+export function sectionRefsForFile(cache: MetadataCache, file: TFile, source: LinkSource, properties: string[], resolve: typeof resolveSubpath = resolveSubpath): SectionRef[] {
+	const meta = cache.getFileCache(file);
+	const names = properties.map((p) => p.trim().replace(/^note\./, '')).filter(Boolean);
+	const out: SectionRef[] = [];
+	const add = (link: string, line: number | null, relation: string) => {
+		const { path, subpath } = parseLinktext(link);
+		const target = path === '' ? file : cache.getFirstLinkpathDest(path, file.path);
+		if (!target) return;
+		const ref: SectionRef = { line, target: target.path, relation };
+		if (subpath) {
+			const tcache = cache.getFileCache(target);
+			const res = tcache ? resolve(tcache, subpath) : null;
+			if (res?.type === 'heading') ref.heading = tcache?.headings?.indexOf(res.current) ?? -1;
+			else if (res?.type === 'block') ref.block = { id: res.block.id, line: res.block.position.start.line };
+			else if (!res) ref.missing = true;
+			if (ref.heading === -1) {
+				delete ref.heading;
+				ref.missing = true;
+			}
+		}
+		out.push(ref);
+	};
+	if (source !== 'body') {
+		for (const ref of meta?.frontmatterLinks ?? []) {
+			if (source === 'frontmatter' && names.length > 0 && !keyMatches(ref.key, names)) continue;
+			add(ref.link, null, relationName(ref.key));
+		}
+	}
+	if (source !== 'frontmatter') for (const ref of [...(meta?.links ?? []), ...(meta?.embeds ?? [])]) add(ref.link, ref.position.start.line, relationName(undefined));
+	return out;
 }
 
 /** Bases view that draws the notes of a base as a force-directed graph on a canvas. */
@@ -227,7 +283,13 @@ export class GraphView extends BasesView implements HoverParent {
 		const colorBy = c.getAsPropertyId(KEY.colorBy);
 		const saved = layout && typeof layout === 'object' && !Array.isArray(layout) ? (layout as Record<string, [number, number]>) : null;
 		const linkColors = c.get(KEY.linkColors) === true;
-		const anyPro = sizeBy !== null || colorBy !== null || shared.length > 0 || depth > 0 || saved !== null || linkColors;
+		const headings = c.get(KEY.headings);
+		const headingChain = c.get(KEY.headingChain) === true;
+		const levelRaw = Number(c.get(KEY.headingLevel));
+		const headingLevel = Number.isFinite(levelRaw) && levelRaw >= 1 && levelRaw <= 6 ? Math.round(levelRaw) : 6;
+		const headingsOn = headings === 'linked' || headings === 'all';
+		// The heading options are hidden while headings are off, so they count as Pro use only when headings are on.
+		const anyPro = sizeBy !== null || colorBy !== null || shared.length > 0 || depth > 0 || saved !== null || linkColors || (headingsOn && (headingChain || headingLevel < 6));
 		return {
 			labels: labels === 'always' || labels === 'hover' ? labels : 'auto',
 			showOrphans: c.get(KEY.orphans) !== false,
@@ -236,6 +298,9 @@ export class GraphView extends BasesView implements HoverParent {
 			linkProperties: Array.isArray(linkProperties) ? linkProperties.filter((p): p is string => typeof p === 'string' && p.trim() !== '') : [],
 			arrows: c.get(KEY.arrows) === true,
 			linkColors: pro && linkColors,
+			headings: headings === 'linked' || headings === 'all' ? headings : 'off',
+			headingChain: pro && headingChain,
+			headingLevel: pro ? headingLevel : 6,
 			sizeBy: pro ? sizeBy : null,
 			colorBy: pro ? colorBy : null,
 			shared: pro ? shared : [],
@@ -253,6 +318,9 @@ export class GraphView extends BasesView implements HoverParent {
 			const values: Record<string, PropValue> = {};
 			for (const p of props) values[p] = toPlain(e.getValue(p));
 			const cache = this.app.metadataCache;
+			if (opts.headings !== 'off') {
+				return { id: e.file.path, label: e.file.basename, links: {}, props: values, headings: headingsForFile(cache, e.file), refs: sectionRefsForFile(cache, e.file, opts.linkSource, opts.linkProperties) };
+			}
 			return { id: e.file.path, label: e.file.basename, links: linksForFile(cache, e.file, opts.linkSource, opts.linkProperties), props: values, relations: relationsForFile(cache, e.file, opts.linkSource, opts.linkProperties) };
 		});
 	}
@@ -267,18 +335,29 @@ export class GraphView extends BasesView implements HoverParent {
 		this.checkLinkColors();
 		const input = this.input(opts);
 		this.paths = new Set(input.map((r) => r.id));
-		const g = buildGraph(input, { showOrphans: opts.showOrphans, sharedProps: opts.shared, focus: opts.focus, depth: opts.focus ? opts.depth : 0 });
+		const g = buildGraph(input, { showOrphans: opts.showOrphans, sharedProps: opts.shared, focus: opts.focus, depth: opts.focus ? opts.depth : 0, headings: opts.headings, chain: opts.headingChain, maxLevel: opts.headingLevel });
 		this.graph = g;
 		this.neighbours = g.nodes.map(() => []);
 		for (const e of g.edges) {
 			this.neighbours[e.source]!.push(e.target);
 			this.neighbours[e.target]!.push(e.source);
 		}
-		const rowsOf = g.nodes.map((n) => input[n.row]!);
-		this.radius = Float64Array.from(
-			opts.sizeBy ? sizeScale(rowsOf.map((r) => parseNumber(r.props?.[opts.sizeBy!] ?? null)), { min: 4, max: 18, fallback: 3 }) : g.nodes.map((n) => Math.min(14, 4 + Math.sqrt(n.degree) * 1.6)),
-		);
-		this.color = opts.colorBy ? colorScale(rowsOf.map((r) => r.props?.[opts.colorBy!] ?? null)) : null;
+		// Size and color read the notes only. Heading and block nodes are small and drawn in the muted sub color.
+		const notes = g.nodes.flatMap((n, i) => (n.sub ? [] : [i]));
+		const rowsOf = notes.map((i) => input[g.nodes[i]!.row]!);
+		const noteRadius = opts.sizeBy ? sizeScale(rowsOf.map((r) => parseNumber(r.props?.[opts.sizeBy!] ?? null)), { min: 4, max: 18, fallback: 3 }) : notes.map((i) => Math.min(14, 4 + Math.sqrt(g.nodes[i]!.degree) * 1.6));
+		this.radius = Float64Array.from(g.nodes, (n) => (n.sub ? (n.sub.kind === 'block' ? SUB_RADIUS - 0.5 : SUB_RADIUS) : 0));
+		notes.forEach((i, k) => {
+			this.radius[i] = noteRadius[k]!;
+		});
+		const noteColor = opts.colorBy ? colorScale(rowsOf.map((r) => r.props?.[opts.colorBy!] ?? null)) : null;
+		if (noteColor) {
+			const slots = new Array<number>(g.nodes.length).fill(-1);
+			notes.forEach((i, k) => {
+				slots[i] = noteColor.slots[k]!;
+			});
+			this.color = { ...noteColor, slots };
+		} else this.color = null;
 		this.linkColor = opts.linkColors ? relationColors(g.edges) : null;
 		const buildMs = performance.now() - t0;
 		this.startLayout(g, opts);
@@ -312,7 +391,8 @@ export class GraphView extends BasesView implements HoverParent {
 		}
 		const saved = g.nodes.map((n) => opts.saved?.[n.id] ?? prev.get(n.id) ?? null);
 		const edges = g.edges.map((e) => [e.source, e.target] as [number, number]);
-		const l = createLayout(g.nodes.length, edges, { linkDistance: opts.spacing }, saved, opts.saved !== null);
+		const parents = g.nodes.map((n) => (n.sub ? n.sub.parent : -1));
+		const l = createLayout(g.nodes.length, edges, { linkDistance: opts.spacing }, saved, opts.saved !== null, parents);
 		(l as LayoutState & { ids?: string[] }).ids = g.nodes.map((n) => n.id);
 		if (prev.size > 0 && opts.saved === null && saved.every((p) => p !== null)) l.alpha = 0.1;
 		this.layout = l;
@@ -376,6 +456,7 @@ export class GraphView extends BasesView implements HoverParent {
 
 	/** Fill color of node i. */
 	nodeColor(i: number, t: Theme): string {
+		if (this.graph?.nodes[i]?.sub) return t.sub ?? t.node;
 		const slot = this.color?.slots[i] ?? -1;
 		if (slot < 0) return t.node;
 		return this.color?.kind === 'number' ? (t.ramp[slot] ?? t.node) : (t.palette[slot % t.palette.length] ?? t.node);
@@ -390,6 +471,7 @@ export class GraphView extends BasesView implements HoverParent {
 	edgeColor(k: number, t: Theme): string {
 		const e = this.graph?.edges[k];
 		if (e?.kind === 'shared') return t.shared;
+		if (e?.kind === 'part') return t.line;
 		return this.slotColor(this.linkColor?.slots[k] ?? -1, t, t.line);
 	}
 
@@ -424,13 +506,13 @@ export class GraphView extends BasesView implements HoverParent {
 		const lw = 1 / zoom;
 		const arrows = this.opts?.arrows === true;
 		this.arrowTips = [];
-		for (const kind of ['shared', 'link'] as const) {
+		for (const kind of ['part', 'shared', 'link'] as const) {
 			ctx.setLineDash(kind === 'shared' ? [4 * lw, 3 * lw] : []);
 			g.edges.forEach((e, k) => {
 				if (e.kind !== kind) return;
 				const lit = near !== null && (e.source === hover || e.target === hover);
-				const width = lit ? 2 : Math.min(3, 1 + Math.log2(e.weight));
-				ctx.globalAlpha = near && !lit ? 0.15 : kind === 'shared' ? 0.55 : 0.8;
+				const width = kind === 'part' ? (lit ? 1.5 : 0.75) : lit ? 2 : Math.min(3, 1 + Math.log2(e.weight));
+				ctx.globalAlpha = near && !lit ? 0.15 : kind === 'link' ? 0.8 : 0.55;
 				ctx.strokeStyle = lit ? t.accent : this.edgeColor(k, t);
 				ctx.lineWidth = lw * width;
 				ctx.beginPath();
@@ -476,9 +558,12 @@ export class GraphView extends BasesView implements HoverParent {
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'top';
 		ctx.fillStyle = t.text;
+		const small = `${size * 0.85}px ${t.font}`;
 		for (let i = 0; i < l.n; i++) {
 			if (!all && !near?.has(i)) continue;
-			ctx.globalAlpha = near && !near.has(i) ? 0.3 : 1;
+			const sub = g.nodes[i]!.sub !== undefined;
+			ctx.font = sub ? small : `${size}px ${t.font}`;
+			ctx.globalAlpha = near && !near.has(i) ? 0.3 : sub ? 0.8 : 1;
 			ctx.fillText(g.nodes[i]!.label, l.x[i]!, l.y[i]! + (this.radius[i] ?? 5) + 2 / zoom);
 		}
 	}
@@ -523,7 +608,10 @@ export class GraphView extends BasesView implements HoverParent {
 		if (evt.button !== 0) return;
 		const i = this.nodeAt(evt);
 		this.canvas.setPointerCapture(evt.pointerId);
-		this.pointer = { mode: i >= 0 ? 'node' : 'pan', node: i, startX: evt.clientX, startY: evt.clientY, moved: false, wasFixed: i >= 0 && this.layout!.fixed[i] === 1 };
+		// A heading or block node sits on a ring around its note, so a drag on it moves the note.
+		let drag = i;
+		while (drag >= 0 && (this.layout!.parent[drag] ?? -1) >= 0) drag = this.layout!.parent[drag]!;
+		this.pointer = { mode: i >= 0 ? 'node' : 'pan', node: i, drag, startX: evt.clientX, startY: evt.clientY, moved: false, wasFixed: drag >= 0 && this.layout!.fixed[drag] === 1 };
 	}
 
 	private onMove(evt: PointerEvent): void {
@@ -545,9 +633,9 @@ export class GraphView extends BasesView implements HoverParent {
 		}
 		const l = this.layout!;
 		const [x, y] = this.toLayout(evt);
-		l.x[p.node] = x;
-		l.y[p.node] = y;
-		l.fixed[p.node] = 1;
+		l.x[p.drag] = x;
+		l.y[p.drag] = y;
+		l.fixed[p.drag] = 1;
 		l.alphaTarget = 0.1;
 		reheat(l, 0.1);
 		if (this.raf === null) this.animate();
@@ -566,8 +654,8 @@ export class GraphView extends BasesView implements HoverParent {
 		if (!p) return null;
 		if (p.mode === 'node' && this.layout) {
 			this.layout.alphaTarget = 0;
-			if (!p.wasFixed && this.opts?.saved === null) this.layout.fixed[p.node] = 0;
-			if (this.opts?.saved) this.layout.fixed[p.node] = 1;
+			if (!p.wasFixed && this.opts?.saved === null) this.layout.fixed[p.drag] = 0;
+			if (this.opts?.saved) this.layout.fixed[p.drag] = 1;
 		}
 		return p;
 	}
@@ -578,8 +666,51 @@ export class GraphView extends BasesView implements HoverParent {
 	 */
 	open(i: number, newTab: boolean | 'tab' | 'split' | 'window' = false): void {
 		const n = this.graph?.nodes[i];
-		const file = n ? this.app.vault.getFileByPath(n.id) : null;
-		if (file) void this.app.workspace.getLeaf(newTab).openFile(file);
+		const file = n ? this.app.vault.getFileByPath(this.notePath(i)) : null;
+		if (!file) return;
+		// A heading or block node opens its note at the heading or block. The subpath goes in the ephemeral state, as
+		// openLinkText does, so a "#" in the file name cannot cut the path.
+		const sub = n?.sub;
+		const leaf = this.app.workspace.getLeaf(newTab);
+		if (!sub) {
+			void leaf.openFile(file);
+			return;
+		}
+		// The subpath scrolls to the first heading with that path. Then the cursor goes to the line of this node,
+		// so a second heading with the same text ("Notes [2]") opens at its own line.
+		void leaf.openFile(file, { eState: { subpath: this.subpathOf(i) } }).then(() => GraphView.showLine(leaf.view, file.path, sub.line));
+	}
+
+	/** Puts the cursor on `line` and scrolls to it, in the Markdown view of `path`. */
+	static showLine(view: unknown, path: string, line: number): void {
+		if (!(view instanceof MarkdownView) || view.file?.path !== path) return;
+		if (view.getMode() === 'preview') {
+			view.previewMode.applyScroll(line);
+			return;
+		}
+		const pos = { line, ch: 0 };
+		view.editor.setCursor(pos);
+		view.editor.scrollIntoView({ from: pos, to: pos }, true);
+	}
+
+	/** Vault path of the note of node i (for a heading or block node, its note). */
+	notePath(i: number): string {
+		const n = this.graph?.nodes[i];
+		if (!n) return '';
+		return n.sub ? (this.graph?.nodes[n.sub.parent] && !this.graph.nodes[n.sub.parent]!.sub ? this.graph.nodes[n.sub.parent]!.id : this.rowPath(n.row)) : n.id;
+	}
+
+	/** Vault path of row r of the last drawn graph. */
+	private rowPath(r: number): string {
+		return this.graph?.nodes.find((x) => !x.sub && x.row === r)?.id ?? this.data.data[r]?.file.path ?? '';
+	}
+
+	/** "#Heading" or "#^block" for a heading or block node, as a link writes it; "" for a note. */
+	subpathOf(i: number): string {
+		const s = this.graph?.nodes[i]?.sub;
+		if (!s) return '';
+		// A nested path ("#Chapter 2#Summary") finds the right one of two headings with the same text.
+		return s.kind === 'block' ? `#^${s.name}` : `#${(s.trail ?? [s.name]).map(headingLinkText).join('#')}`;
 	}
 
 	private onWheel(evt: WheelEvent): void {
@@ -623,13 +754,14 @@ export class GraphView extends BasesView implements HoverParent {
 		}
 		this.fillTip(i);
 		this.placeTip(evt);
-		this.app.workspace.trigger('hover-link', { event: evt, source: VIEW_ID, hoverParent: this, targetEl: this.canvas, linktext: n.id, sourcePath: '' });
+		this.app.workspace.trigger('hover-link', { event: evt, source: VIEW_ID, hoverParent: this, targetEl: this.canvas, linktext: n.sub ? `${this.notePath(i)}${this.subpathOf(i)}` : n.id, sourcePath: '' });
 	}
 
 	private fillTip(i: number): void {
 		const n = this.graph!.nodes[i]!;
 		this.tip.empty();
-		this.tip.createDiv({ cls: 'bases-link-graph-tip-title', text: n.label });
+		const note = n.sub ? this.graph!.nodes.find((x) => !x.sub && x.row === n.row) : undefined;
+		this.tip.createDiv({ cls: 'bases-link-graph-tip-title', text: n.sub ? `${note?.label ?? ''} › ${n.label}` : n.label });
 		const links = this.graph!.edges.filter((e) => e.kind === 'link' && (e.source === i || e.target === i)).length;
 		this.tip.createDiv({ text: `${links} ${links === 1 ? 'link' : 'links'} in this base` });
 		const lines = this.relationLines(i);
@@ -653,7 +785,7 @@ export class GraphView extends BasesView implements HoverParent {
 		for (const e of g.edges) {
 			if (e.kind !== 'link' || (e.source !== i && e.target !== i)) continue;
 			const other = g.nodes[e.source === i ? e.target : e.source]!;
-			for (const r of e.relations ?? []) out.push({ dir: r.from === n.row ? 0 : 1, name: r.name, label: other.label });
+			for (const r of e.relations ?? []) out.push({ dir: (r.node !== undefined ? r.node === i : r.from === n.row) ? 0 : 1, name: r.name, label: other.label });
 		}
 		out.sort((a, b) => a.dir - b.dir || a.name.localeCompare(b.name) || a.label.localeCompare(b.label));
 		return out.map((r) => `${r.name} ${r.dir === 0 ? '→' : '←'} ${r.label}`);
@@ -675,7 +807,7 @@ export class GraphView extends BasesView implements HoverParent {
 			it
 				.setTitle(isPro() ? 'Show only notes near this one' : 'Show only notes near this one (Pro)')
 				.setIcon('locate-fixed')
-				.onClick(() => this.setFocus(n.id)),
+				.onClick(() => this.setFocus(this.notePath(i))),
 		);
 		if (this.opts?.focus) menu.addItem((it) => it.setTitle('Show all notes').setIcon('locate-off').onClick(() => this.setFocus(null)));
 		menu.showAtMouseEvent(evt);
@@ -698,8 +830,12 @@ export class GraphView extends BasesView implements HoverParent {
 		const o = this.opts!;
 		this.bar.empty();
 		const links = g.edges.filter((e) => e.kind === 'link').length;
-		const shared = g.edges.length - links;
-		const parts = [`${g.nodes.length} ${g.nodes.length === 1 ? 'note' : 'notes'}`, `${links} ${links === 1 ? 'link' : 'links'}`];
+		const shared = g.edges.filter((e) => e.kind === 'shared').length;
+		const subs = g.nodes.filter((n) => n.sub).length;
+		const notes = g.nodes.length - subs;
+		const parts = [`${notes} ${notes === 1 ? 'note' : 'notes'}`, `${links} ${links === 1 ? 'link' : 'links'}`];
+		if (o.headings !== 'off') parts.push(`${subs} ${subs === 1 ? 'heading or block' : 'headings and blocks'}`);
+		if (g.missing) parts.push(`${g.missing} heading or block ${g.missing === 1 ? 'link' : 'links'} not found`);
 		if (shared > 0) parts.push(`${shared} shared values`);
 		if (o.linkSource === 'body') parts.push('Body links only');
 		if (o.linkSource === 'frontmatter') parts.push(o.linkProperties.length > 0 ? `Properties: ${o.linkProperties.join(', ')}` : 'Property links only');
@@ -711,7 +847,7 @@ export class GraphView extends BasesView implements HoverParent {
 			setIcon(x, 'x');
 			x.addEventListener('click', () => this.setFocus(null));
 		}
-		if (o.proIgnored) this.bar.createSpan({ cls: 'bases-link-graph-pro-note', text: 'Size, color, shared values, depth, link colors and saved layouts are Pro features. They are off.' });
+		if (o.proIgnored) this.bar.createSpan({ cls: 'bases-link-graph-pro-note', text: 'Size, color, shared values, depth, link colors, heading nesting, heading levels and saved layouts are Pro features. They are off.' });
 		this.button('maximize', 'Fit to view', () => {
 			this.fit();
 			this.draw();
@@ -799,6 +935,7 @@ export function viewOptions(config: BasesViewConfig): BasesAllOptions[] {
 		{ type: 'dropdown', key: KEY.linkSource, displayName: 'Draw links from', default: 'all', options: { all: 'All links', body: 'Note body', frontmatter: 'Properties' } },
 		{ type: 'multitext', key: KEY.linkProperties, displayName: 'Link properties (empty = all)', default: [], shouldHide: () => config.get(KEY.linkSource) !== 'frontmatter' },
 		{ type: 'toggle', key: KEY.arrows, displayName: 'Show arrows', default: false },
+		{ type: 'dropdown', key: KEY.headings, displayName: 'Headings and blocks', default: 'off', options: { off: 'Off', linked: 'Linked headings and blocks', all: 'All headings' } },
 		{
 			type: 'group',
 			displayName: 'Pro',
@@ -808,6 +945,8 @@ export function viewOptions(config: BasesViewConfig): BasesAllOptions[] {
 				{ type: 'multitext', key: KEY.shared, displayName: 'Join notes that share', default: [] },
 				{ type: 'slider', key: KEY.depth, displayName: 'Local depth (0 = all notes)', default: 0, min: 0, max: 5, step: 1 },
 				{ type: 'toggle', key: KEY.linkColors, displayName: 'Color links by relation', default: false },
+				{ type: 'toggle', key: KEY.headingChain, displayName: 'Nest headings under their parent heading', default: false, shouldHide: () => config.get(KEY.headings) !== 'linked' && config.get(KEY.headings) !== 'all' },
+				{ type: 'slider', key: KEY.headingLevel, displayName: 'Deepest heading level', default: 6, min: 1, max: 6, step: 1, shouldHide: () => config.get(KEY.headings) !== 'linked' && config.get(KEY.headings) !== 'all' },
 			],
 		},
 	];

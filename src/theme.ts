@@ -7,6 +7,8 @@ export interface Theme {
 	shared: string;
 	text: string;
 	accent: string;
+	/** Heading and block nodes: the node color mixed toward the background. */
+	sub?: string;
 	font: string;
 	/** Category colors (8). */
 	palette: string[];
@@ -56,9 +58,11 @@ export function readTheme(el: HTMLElement, canvas: HTMLCanvasElement): Theme {
 	const palette = PALETTE_VARS.map((v, i) => get(v, ['#086ddd', '#ec7500', '#08b94e', '#7852ee', '#e93147', '#00bfbc', '#e0ac00', '#d53984'][i]!));
 	const low = palette[5]!;
 	const high = palette[3]!;
+	const node = get('--graph-node', get('--text-muted', '#888888'));
 	return {
 		background,
-		node: get('--graph-node', get('--text-muted', '#888888')),
+		node,
+		sub: mix(node, background, 0.4),
 		line: get('--graph-line', get('--background-modifier-border', '#cccccc')),
 		shared: accent,
 		text: get('--graph-text', get('--text-normal', '#222222')),

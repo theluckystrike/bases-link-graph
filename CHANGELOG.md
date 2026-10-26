@@ -1,5 +1,11 @@
 # bases-link-graph
 
+## 1.5.3
+
+### Patch Changes
+
+- The Bases Link Graph notice for a Pro feature now has a Sponsor on GitHub button.
+
 ## 1.5.2
 
 ### Patch Changes

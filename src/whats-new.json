@@ -1,10 +1,9 @@
 {
 	"id": "bases-link-graph",
 	"name": "Bases Link Graph",
-	"version": "1.5.2",
+	"version": "1.5.3",
 	"changes": [
-		"The hover preview of a note with \"#\" in its name or folder now shows that note, not a different note.",
-		"Its heading and block nodes now preview that note at the heading or block."
+		"The Bases Link Graph notice for a Pro feature now has a Sponsor on GitHub button."
 	],
 	"tip": "Click a heading node to open its note at that heading.",
 	"thanks": "Hi, I am Michael, a solo developer in Poland. Bases Link Graph is one of over 100 small plugins that I make. Thank you for using it with Bases. Bases is still new, and your setups teach me a lot.",

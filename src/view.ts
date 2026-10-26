@@ -1,7 +1,7 @@
-import { BasesView, BooleanValue, NumberValue, StringValue, Keymap, MarkdownView, Menu, Notice, parseLinktext, resolveSubpath, setIcon, type BasesAllOptions, type BasesPropertyId, type BasesViewConfig, type HoverParent, type HoverPopover, type MetadataCache, type QueryController, type TFile } from 'obsidian';
+import { BasesView, BooleanValue, NumberValue, StringValue, Keymap, MarkdownView, Menu, parseLinktext, resolveSubpath, setIcon, type BasesAllOptions, type BasesPropertyId, type BasesViewConfig, type HoverParent, type HoverPopover, type MetadataCache, type QueryController, type TFile } from 'obsidian';
 import { arrowEnds, arrowHead, arrowSize, buildGraph, colorScale, headingLinkText, keyMatches, linkCounts, linkRelations, parseNumber, relationColors, relationName, sizeScale, type ColorResult, type Graph, type HeadingInput, type HeadingMode, type LinkSource, type NodeInput, type PropValue, type ResolvedReference, type SectionRef } from './graph';
 import { bounds, createLayout, hitTest, reheat, run, tick, type LayoutState } from './layout';
-import { isPro, onProChange } from './pro';
+import { isPro, onProChange, proNotice } from './pro';
 import { readTheme, type Theme } from './theme';
 import type BasesLinkGraphPlugin from './main';
 
@@ -946,7 +946,7 @@ export class GraphView extends BasesView implements HoverParent {
 
 	/** Shows a notice that a feature needs Pro. */
 	static needsPro(feature: string): void {
-		new Notice(`${feature} is a pro feature. Sponsor on GitHub, then sign in from the plugin settings.`);
+		proNotice(`${feature} is a pro feature.`);
 	}
 }
 

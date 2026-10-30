@@ -1,5 +1,11 @@
 # bases-link-graph
 
+## 1.5.4
+
+### Patch Changes
+
+- The Sponsor on GitHub button of Bases Link Graph now opens the one-time payment tab of GitHub Sponsors.
+
 ## 1.5.3
 
 ### Patch Changes

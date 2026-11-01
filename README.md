@@ -6,7 +6,7 @@ Bases Link Graph draws the notes that a base selects as a graph. Each note is a 
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/bases-link-graph.gif" alt="A base of 30 team notes drawn as a graph, then colored by type, joined by team and narrowed to the notes near one project" width="720">
 
-Free: filtered notes, links, navigation, previews, embeds, live updates. Pro: property styling, link colors, nested headings with a level limit, shared-value edges, local depth, exports, saved layouts. $15 one time or $5 a month: [Sponsor](https://github.com/sponsors/theluckystrike?frequency=one-time&metadata_source=bases-link-graph) or [$15 one-time offer](https://github.com/sponsors/theluckystrike/sponsorships?tier_id=666162&metadata_source=bases-link-graph).
+Pro costs $15 one time or $5 a month: [Sponsor](https://github.com/sponsors/theluckystrike?frequency=one-time&metadata_source=bases-link-graph) or [$15 one-time offer](https://github.com/sponsors/theluckystrike/sponsorships?tier_id=666162&metadata_source=bases-link-graph).
 
 ## Quick start
 
@@ -28,15 +28,13 @@ With "Show notes without links" on, each row becomes one node. Links to notes ou
 
 ### Choose the source of links
 
-Set "Draw links from" to "All links" (the default), "Note body" (with embeds) or "Properties". Add names such as `parent` to "Link properties" to select relations. An empty list uses all properties. The filter is free and saved with each view.
+Set "Draw links from" to "All links" (the default), "Note body" (with embeds) or "Properties". Add names such as `parent` to "Link properties" to select relations. An empty list uses all properties. The filter is saved with each view.
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/link-source.png" alt="The team base shows only links from the project property" width="720">
 
 ### Arrows and link types
 
-Turn on "Show arrows" to point each link at its target. A link both ways gets two arrowheads. Hover over a note to see its relations, such as `parent → Rose`. Body links are `body`. Both are free.
-
-Pro: "Color links by relation" gives each relation a color, with a "Links" legend.
+Turn on "Show arrows" to point each link at its target. Hover over a note to see its relations, such as `parent → Rose`. Body links are `body`. Pro colors each relation, with a "Links" legend.
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/link-types.png" alt="A family base with parent and friend links: arrows, two link colors and the Links legend" width="720">
 
@@ -44,15 +42,13 @@ Pro: "Color links by relation" gives each relation a color, with a "Links" legen
 
 ### Headings and blocks as nodes
 
-Set "Headings and blocks" to "Linked headings and blocks". A link such as `[[Book#Repair]]` or `[[Book#^q1]]` then points to a small node on its note. Embeds, aliases and nested headings count. A link to a missing heading goes to the note. "Off" is the default.
+Set "Headings and blocks" to "Linked headings and blocks". A link such as `[[Book#Repair]]` or `[[Book#^q1]]` then points to a small node on its note. Embeds, aliases and nested headings count. A link to a missing heading goes to the note.
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/headings.png" alt="A book note with its linked headings and a block as small nodes, and the links from a reading log to them" width="720">
 
-"All headings" shows every heading. A body link starts at the heading that holds it, so an image hangs from its chapter. Click a heading node to open the note there. Both modes are free.
+"All headings" shows every heading. A body link starts at the heading that holds it, so an image hangs from its chapter. Click a heading node to open the note there.
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/all-headings.png" alt="Every heading of the book notes as a node, with the image under the Damage heading" width="720">
-
-Pro nests headings and sets the deepest level.
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/nested-headings.png" alt="Pro: the chapters nest under the book title heading, with heading levels 1 and 2" width="720">
 
@@ -64,7 +60,7 @@ Click a node to open its note. Ctrl-click (Cmd-click on macOS) opens a new tab. 
 
 ### Trackpad navigation
 
-With the free "Trackpad navigation" setting on, a two-finger scroll pans. Pinch, or hold Ctrl or Cmd while scrolling, to zoom.
+With "Trackpad navigation" on, a two-finger scroll pans. Pinch, or hold Ctrl or Cmd while scrolling, to zoom.
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/trackpad.png" alt="The free trackpad navigation switch in the plugin settings" width="720">
 
@@ -76,25 +72,25 @@ After a link changes, the graph draws again and nodes keep their place. Embed a 
 
 ### Size and color by a property (Pro)
 
-Set "Size by" to a number property, such as hours, and the node area follows the value. Set "Color by" to any property, such as type, for a legend with counts. Many numbers become five ranges. Past eight values, the rest share one "Other" color.
+Set "Size by" and "Color by" in the view options. For "Color by", many numbers become five ranges, and past eight values the rest share one "Other" color.
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/size-color.png" alt="Nodes colored by type with a legend, projects sized by hours" width="720">
 
 ### Edges from shared values (Pro)
 
-In "Join notes that share", type property names such as `team` or `tags`. Notes with the same value get a dashed edge. Case, a leading `#` and wikilink brackets do not matter. A value that more than 12 notes share joins them in a chain.
+In "Join notes that share", type property names such as `team` or `tags`. A value that more than 12 notes share joins them in a chain.
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/shared-values.png" alt="Dashed edges between notes of the same team, next to the solid link edges" width="720">
 
 ### Local depth (Pro)
 
-Right-click a node and select "Show only notes near this one". The graph then shows the notes up to N edges away. Set N from 1 to 5 with the "Local depth" slider. The x on the chip above the graph shows all notes again.
+Right-click a node and select "Show only notes near this one". The "Local depth" slider sets the depth. The x on the chip above the graph shows all notes again.
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/local-depth.png" alt="Only the Atlas note and its six direct neighbours" width="720">
 
 ### Export and saved layouts (Pro)
 
-The buttons above the graph and the export commands create PNG or SVG files of the whole graph with labels. SVG also has the legend. "Save layout" keeps node positions in the base file. "Reset layout" removes them.
+Use the buttons above the graph or the commands. Exports show the whole graph with labels, and SVG also has the legend. "Reset layout" removes a saved layout.
 
 <img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/export.png" alt="The exported SVG image of the graph with its legend, open in a new tab" width="720">
 
@@ -115,7 +111,25 @@ The base limit applies: when the base shows the first 100 results, the graph has
 
 ## Pro
 
-The free version has no note limit. Pro adds the features marked (Pro) above. To get it:
+The command "What Pro adds" shows each with a demo.
+
+<img src="https://raw.githubusercontent.com/theluckystrike/bases-link-graph/HEAD/docs/what-pro.png" alt="The What Pro adds window with a Try it demo" width="720">
+
+- Size by: the node size shows the value of a number property.
+- Color by: the node color shows the value of a property, with a legend.
+- Color links by relation: each relation gets its own color, with a Links legend.
+- Headings hang from their parent heading, and you can hide the headings below a level.
+
+More Pro tools:
+
+- Notes that share a property value get a dashed edge.
+- Local depth shows only the notes up to 1 to 5 links away from one note.
+- Export the graph to a PNG or an SVG file.
+- Save the positions of the nodes in the base file.
+
+Sponsor $5 a month, or $15 once. When you have paid $15 in total, Pro stays on.
+
+The free version has no note limit. To get Pro:
 
 1. Sponsor through [GitHub Sponsors](https://github.com/sponsors/theluckystrike?frequency=one-time&metadata_source=bases-link-graph). A total payment of $15 meets the payment requirement for Pro without further payment. Sign-in and the checks below still apply.
 2. In Obsidian, open the settings of Bases Link Graph and select "Sign in with GitHub".
@@ -146,7 +160,7 @@ View options (base toolbar, saved in the base file):
 | Nest headings under their parent heading (Pro) | A heading hangs from its parent heading. |
 | Deepest heading level (Pro) | Hides headings below this level, 1 to 6. |
 
-The settings tab has the Pro section, "Animate the layout" (on), "Trackpad navigation" (off) and "Live update delay" (100 to 2000 ms, 400 ms).
+The settings tab also has "Animate the layout" (on), "Trackpad navigation" (off) and "Live update delay" (100 to 2000 ms, 400 ms).
 
 ## FAQ
 

@@ -138,5 +138,13 @@
 		"caption": "The free setting enables swipe to pan and pinch to zoom.",
 		"eval": "(async () => { const p = app.plugins.plugins['bases-link-graph']; p.pro.signOut(); p.settings.trackpad = true; app.setting.open(); app.setting.openTabById('bases-link-graph'); return 'trackpad setting on'; })()",
 		"after": "app.setting.close(); app.plugins.plugins['bases-link-graph'].settings.trackpad = false; 'ok'"
+	},
+	{
+		"feature": "what-pro",
+		"caption": "The command \"What Pro adds\" lists each Pro feature with a Try it demo, the price, Sponsor $15 once and Sign in with GitHub.",
+		"note": "Team graph.base",
+		"eval": "(async () => { document.querySelectorAll('.modal-container').forEach(el => el.remove()); app.commands.executeCommandById('bases-link-graph:what-pro-adds'); await new Promise(r=>setTimeout(r,600)); const m=document.querySelector('.modal.pf-whatpro'); if(!m) throw new Error('What Pro adds did not open'); const b=Array.from(m.querySelectorAll('button')).map(x=>x.textContent); if(!b.includes('Sponsor $15 once')||!b.includes('Sign in with GitHub')) throw new Error('Missing buttons: '+b.join(',')); m.querySelector('.pf-whatpro-feature button').click(); await new Promise(r=>setTimeout(r,500)); const d=m.querySelector('.pf-whatpro-demo'); if(!d || d.textContent.includes('could not run') || (d.textContent.trim()==='' && !d.querySelector('svg, table'))) throw new Error('No demo'); return 'ok'; })()",
+		"after": "(async () => { document.querySelectorAll('.modal-container').forEach(el => el.remove()); return 'ok'; })()",
+		"wait": 700
 	}
 ]

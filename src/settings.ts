@@ -1,5 +1,5 @@
 import { PluginSettingTab, type SettingDefinitionItem } from 'obsidian';
-import { sponsorsSettingItems } from './license/github-obsidian';
+import { sponsorsSettingItemsWithWhatPro } from './license/github-obsidian';
 import { PRO_UI, isPro } from './pro';
 import type BasesLinkGraphPlugin from './main';
 import { helloSettingItems } from './hello/settings';
@@ -48,7 +48,7 @@ export class BasesLinkGraphSettingTab extends PluginSettingTab {
 
 	productSettingDefinitions(): SettingDefinitionItem[] {
 		return [
-			...(this.plugin.pro ? sponsorsSettingItems(this.plugin.pro, PRO_UI) : []),
+			...(this.plugin.pro ? sponsorsSettingItemsWithWhatPro(this.plugin.pro, PRO_UI, () => this.plugin.openWhatPro()) : []),
 			{
 				name: 'Animate the layout',
 				desc: 'Show the nodes as they move into place. Turn off to draw the finished layout at once.',

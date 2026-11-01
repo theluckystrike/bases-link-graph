@@ -1,7 +1,7 @@
 // Pro through GitHub Sponsors (packages/license, github.ts). product.yaml pro: holds the same values; fx check compares them.
 // Every Pro check in the plugin calls isPro(); views redraw through onProChange(). main.ts binds the manager in onload.
 import type { SponsorsConfig, SponsorsManager } from './license/index';
-import { showProNotice } from './license/github-obsidian';
+import { showProNoticeWithWhatPro } from './license/github-obsidian';
 
 export const SPONSORS: SponsorsConfig = {
 	// Public client id of the seller's OAuth App (device flow on, no client secret anywhere).
@@ -23,6 +23,8 @@ export const PRO_UI = {
 type Listener = () => void;
 
 let manager: SponsorsManager | null = null;
+/** Opens the "What Pro adds" window. main.ts sets it in onload. */
+let whatPro: (() => void) | null = null;
 let unbind: (() => void) | null = null;
 const listeners = new Set<Listener>();
 
@@ -53,10 +55,19 @@ export function resetPro(): void {
 	unbind?.();
 	unbind = null;
 	manager = null;
+	whatPro = null;
 	listeners.clear();
 }
 
-/** Shows the shared Pro notice: the lead, then the next step for this user. A free user gets a Sponsor on GitHub button. */
+/** Sets the function that opens the "What Pro adds" window (the link in the Pro notice). */
+export function bindWhatPro(open: (() => void) | null): void {
+	whatPro = open;
+}
+
+/**
+ * Shows the shared Pro notice: the lead, then the next step for this user. A free user gets a Sponsor on GitHub button.
+ * The notice also has a "What Pro adds" link.
+ */
 export function proNotice(lead: string): void {
-	showProNotice(manager, lead);
+	showProNoticeWithWhatPro(manager, lead, () => whatPro?.());
 }

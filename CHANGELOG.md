@@ -1,5 +1,11 @@
 # bases-link-graph
 
+## 1.5.5
+
+### Patch Changes
+
+- 2bdf5e2: Add the "What Pro adds" window. It lists each Pro feature with a "Try it" demo on a sample graph, the price, a "Sponsor $15 once" button and "Sign in with GitHub". Open it with the command "What Pro adds", the button in the Pro section of the settings, or the link in the Pro notice. It never opens by itself.
+
 ## 1.5.4
 
 ### Patch Changes

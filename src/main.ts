@@ -1,13 +1,14 @@
 import { Notice, Plugin, normalizePath, type TFile } from 'obsidian';
 import type { SponsorsManager } from './license/index';
-import { createGitHubSponsors } from './license/github-obsidian';
+import { WHAT_PRO_TITLE, createGitHubSponsors } from './license/github-obsidian';
 import { arrowEnds, relationNames, toSvg, type SvgModel } from './graph';
 import { bounds } from './layout';
-import { SPONSORS, bindPro, isPro, resetPro } from './pro';
+import { SPONSORS, bindPro, bindWhatPro, isPro, resetPro } from './pro';
 import { DEFAULT_SETTINGS, BasesLinkGraphSettingTab, normalizeSettings, type BasesLinkGraphSettings } from './settings';
 import { GraphView, KEY, VIEW_ID, viewOptions } from './view';
 import { setupHello } from './hello/index';
 import WHATS_NEW from './whats-new.json';
+import { openWhatPro } from './what-pro';
 
 /** How often to ask the license state whether a check is due. It sends a request only when signed in and due (7 days). */
 const PRO_TICK_MS = 6 * 60 * 60 * 1000;
@@ -49,6 +50,7 @@ export default class BasesLinkGraphPlugin extends Plugin {
 		pro.init();
 		this.pro = pro;
 		bindPro(pro);
+		bindWhatPro(() => this.openWhatPro());
 		this.register(pro.onChange(() => this.settingTab?.update()));
 		this.settingTab = new BasesLinkGraphSettingTab(this.app, this);
 		this.addSettingTab(this.settingTab);
@@ -67,6 +69,8 @@ export default class BasesLinkGraphPlugin extends Plugin {
 		this.addViewCommand('export-png', 'Export the graph as a PNG image', (v) => void this.exportView(v, 'png'));
 		this.addViewCommand('export-svg', 'Export the graph as an SVG image', (v) => void this.exportView(v, 'svg'));
 		this.addViewCommand('save-layout', 'Save the layout of the graph', (v) => void this.saveLayout(v));
+		// Opens only on this command, the settings button or the link in the Pro notice. Never at startup.
+		this.addCommand({ id: 'what-pro-adds', name: WHAT_PRO_TITLE, callback: () => this.openWhatPro() });
 		this.app.workspace.onLayoutReady(() => {
 			void this.reopenStaleBases();
 			void pro.refresh();
@@ -113,6 +117,11 @@ export default class BasesLinkGraphPlugin extends Plugin {
 	targetView(): GraphView | null {
 		const open = [...this.views].filter((v) => v.graph !== null);
 		return open.find((v) => v.isActive()) ?? open[open.length - 1] ?? null;
+	}
+
+	/** The "What Pro adds" window: each Pro feature with a demo on sample rows, the price and the sign in. */
+	openWhatPro(): void {
+		openWhatPro(this.app, this.pro, this.manifest.id, this.manifest.name);
 	}
 
 	async loadSettings(): Promise<void> {

@@ -1,9 +1,9 @@
 {
 	"id": "bases-link-graph",
 	"name": "Bases Link Graph",
-	"version": "1.5.4",
+	"version": "1.5.5",
 	"minAppVersion": "1.13.4",
-	"description": "Draws the notes that a base selects as an interactive graph. Links become edges, and you click a node to open its note.",
+	"description": "Draw the notes of a base as a graph view. Show link types as arrows, such as parent, and click a node to open its note. Pro colors each link type.",
 	"author": "Michael Lip",
 	"authorUrl": "https://github.com/theluckystrike",
 	"fundingUrl": "https://github.com/sponsors/theluckystrike",

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildGraph, displayValue, toSvg, valueKey, withinDepth, xmlEscape } from '../src/graph';
 import { mix, parseRgb } from '../src/theme';
 import { toPlain, toPropertyId } from '../src/view';
+import { GROWTH_LIMIT, growth } from './growth';
 
 describe('values', () => {
 	it('display form and comparison key', () => {
@@ -51,15 +52,18 @@ describe('graph', () => {
 		expect([...withinDepth(3, [{ source: 0, target: 1, kind: 'link', weight: 1 }], 0, 0)]).toEqual([0]);
 	});
 
-	it('500 rows build in well under a frame', () => {
-		const rows = Array.from({ length: 500 }, (_, i) => ({ id: `n${i}`, label: `n${i}`, links: { [`n${(i + 1) % 500}`]: 1 }, props: { 'note.tags': [`t${i % 10}`] } }));
-		const t0 = performance.now();
-		const g = buildGraph(rows, { sharedProps: ['note.tags'] });
-		const ms = performance.now() - t0;
+	it('500 rows build in linear time', () => {
+		const rowsOf = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `n${i}`, label: `n${i}`, links: { [`n${(i + 1) % n}`]: 1 }, props: { 'note.tags': [`t${i % 10}`] } }));
+		const g = buildGraph(rowsOf(500), { sharedProps: ['note.tags'] });
 		expect(g.nodes).toHaveLength(500);
 		// 500 links + 10 tags x 50 rows as chains (49 each) = 990 edges.
 		expect(g.edges).toHaveLength(500 + 10 * 49);
-		expect(ms).toBeLessThan(process.env.FX_PERF_STRICT === '1' ? 20 : 200);
+		// Timing guard that holds on a slow shared CI runner (s1103 CIFIX): 10 times the rows, about 10 times the time.
+		const build = growth((n) => {
+			const rows = rowsOf(n);
+			return () => buildGraph(rows, { sharedProps: ['note.tags'] });
+		}, 5000);
+		expect(build.ratio, build.text).toBeLessThan(GROWTH_LIMIT);
 	});
 });
 

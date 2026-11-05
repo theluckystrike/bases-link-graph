@@ -170,7 +170,7 @@ The core graph shows the vault or one note. Bases Link Graph uses the filters of
 
 ### How fast is it?
 
-The end-to-end test draws a base of 500 notes and 1,490 links. It fails when the layout warm-up takes 400 ms or more, or a frame takes 50 ms on average. We have not measured phones or tablets.
+A test draws 500 notes and 1,490 links and needs a layout warm-up under 400 ms and frames under 50 ms on average. We have not measured phones or tablets.
 
 ### Does it change my notes?
 
@@ -179,6 +179,8 @@ No. Saved layouts and view options go in the base file. Export creates a new fil
 ## Payment, account and network
 
 The core features are free. Pro features need a GitHub Sponsors sponsorship of theluckystrike: $5 a month or more, or $15 once. A total payment of $15 meets the payment requirement for Pro without further payment. Sign-in and the checks below still apply. Your notes stay readable and editable with or without Pro.
+
+[One payment turns on Pro in every NoteMods plugin](https://notemods.com/pro/).
 
 GitHub handles the payment. Sponsor at https://github.com/sponsors/theluckystrike?frequency=one-time&metadata_source=bases-link-graph. You need no account for the free features. Pro needs the GitHub account that sponsors.
 

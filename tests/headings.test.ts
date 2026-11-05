@@ -6,6 +6,7 @@ import { bindPro, resetPro } from '../src/pro';
 import { DEFAULT_SETTINGS } from '../src/settings';
 import { GraphView, KEY, SUB_RADIUS, sectionRefsForFile, viewOptions } from '../src/view';
 import type { Theme } from '../src/theme';
+import { GROWTH_LIMIT, growth, pairedRatio } from './growth';
 
 // Headings and blocks as nodes (1.5.0, forum topic 6653). The pure graph cases are golden vectors; this file tests
 // the cache adapter, the view options, open and hover, redraw after a heading rename, and the size budget.
@@ -257,43 +258,80 @@ function bigRows(n = 500): NodeInput[] {
 	}));
 }
 
+/** A layout for the graph of rows in a heading mode, as render() makes it. */
+function layoutOf(rows: NodeInput[], mode: 'off' | 'linked' | 'all') {
+	const g = buildGraph(rows, { headings: mode });
+	return createLayout(g.nodes.length, g.edges.map((e) => [e.source, e.target] as [number, number]), {}, [], false, g.nodes.map((n) => (n.sub ? n.sub.parent : -1)));
+}
+
+/** One tick of a hot layout. The alpha goes back to 0.5 first, so the layout does not cool down and stop during the timing. */
+function hotTick(l: ReturnType<typeof createLayout>): () => unknown {
+	return () => {
+		l.alpha = 0.5;
+		return tick(l);
+	};
+}
+
+/** Tick time with the heading nodes of a mode divided by the tick time of the same notes without heading nodes. */
+function tickRatio(rows: NodeInput[], mode: 'linked' | 'all') {
+	return pairedRatio(hotTick(layoutOf(rows, 'off')), hotTick(layoutOf(rows, mode)));
+}
+
+/**
+ * Limit for the tick ratios. Satellites add a ring placement and their edges to each tick, but no
+ * repulsion, and repulsion costs the square of the bodies. If heading nodes repelled as bodies, the linked mode of
+ * bigRows (1,000 nodes for 500 notes) would give about 4 times the pairs, and 1,000 notes x 20 headings in the all mode
+ * about 440 times. On the agent Mac (2026-11-03) the ratio was 0.99 to 1.34. 2.5 is about 1.9 times the highest ratio.
+ */
+const TICK_LIMIT = 2.5;
+
 describe('size budget with heading nodes', () => {
-	it('linked: 500 notes and their linked headings build in 50 ms and lay out at interactive speed', () => {
-		const t0 = performance.now();
+	it('linked: 500 notes and their linked headings build in linear time and lay out at interactive speed', () => {
 		const g = buildGraph(bigRows(), { headings: 'linked' });
-		const buildMs = performance.now() - t0;
 		const notes = g.nodes.filter((n) => !n.sub).length;
 		expect(notes).toBe(500);
-		const l = createLayout(g.nodes.length, g.edges.map((e) => [e.source, e.target] as [number, number]), {}, [], false, g.nodes.map((n) => (n.sub ? n.sub.parent : -1)));
-		const t1 = performance.now();
-		const ticks = run(l, 300);
-		const perTick = (performance.now() - t1) / ticks;
-		console.log(`perf headings linked: ${g.nodes.length} nodes, ${g.edges.length} edges, build ${buildMs.toFixed(1)} ms, ${perTick.toFixed(2)} ms per tick`);
-		expect(buildMs).toBeLessThan(process.env.CI ? 200 : 50);
-		// Same budget per node as the 500 node test (8 ms local, 12 ms on CI), for the larger node count.
-		expect(perTick).toBeLessThan((process.env.CI ? 12 : 8) * (g.nodes.length / 500) ** 1.2);
+		// Timing guards that hold on a slow shared CI runner (s1103 CIFIX). Both times of each ratio come from this test.
+		// Build: 10 times the notes must give about 10 times the time, not about 100 times.
+		const build = growth((n) => {
+			const rows = bigRows(n);
+			return () => buildGraph(rows, { headings: 'linked' });
+		}, 5000);
+		// A tick with the linked heading nodes against a tick of the same 500 notes without heading nodes (core first).
+		// Heading nodes are satellites: they add no repulsion, so the tick costs about the same.
+		const tickWith = tickRatio(bigRows(), 'linked');
+		console.log(`perf headings linked: ${g.nodes.length} nodes, ${g.edges.length} edges, build growth ${build.ratio.toFixed(1)} (${build.text}), tick ratio ${tickWith.ratio.toFixed(2)} (${tickWith.text})`);
+		expect(build.ratio, build.text).toBeLessThan(GROWTH_LIMIT);
+		expect(tickWith.ratio, tickWith.text).toBeLessThan(TICK_LIMIT);
 	});
 
 	it('all: 500 notes with 2,000 heading nodes stay finite', () => {
 		const g = buildGraph(bigRows(), { headings: 'all' });
 		expect(g.nodes).toHaveLength(2500);
 		const l = createLayout(g.nodes.length, g.edges.map((e) => [e.source, e.target] as [number, number]), {}, [], false, g.nodes.map((n) => (n.sub ? n.sub.parent : -1)));
-		const t0 = performance.now();
-		const ticks = run(l, 60);
-		const perTick = (performance.now() - t0) / ticks;
-		console.log(`perf headings all: ${g.nodes.length} nodes, ${g.edges.length} edges, ${perTick.toFixed(2)} ms per tick`);
+		expect(run(l, 60)).toBeGreaterThan(0);
 		expect(Array.from(l.x).every(Number.isFinite)).toBe(true);
-		expect(perTick).toBeLessThan(process.env.CI ? 60 : 30);
+		// Timing guard that holds on a slow shared CI runner (s1103b ASSERT-A). It replaces a limit of 60 ms per tick.
+		// A tick with the 2,000 heading nodes against a tick of the same 500 notes without heading nodes (core first).
+		// 2,000 heading nodes that repelled as bodies would give 2,500 bodies and about 25 times the pairs.
+		// On the agent Mac (2026-11-03, 5 runs) the ratio was 1.10 to 1.16 against TICK_LIMIT 2.5.
+		const perTick = tickRatio(bigRows(), 'all');
+		console.log(`perf headings all: ${g.nodes.length} nodes, ${g.edges.length} edges, tick ratio ${perTick.ratio.toFixed(2)} (${perTick.text})`);
+		expect(perTick.ratio, perTick.text).toBeLessThan(TICK_LIMIT);
 	});
 
-	it('one long note: 5,000 headings and 5,000 links build in 100 ms', () => {
-		const headings = Array.from({ length: 5000 }, (_, k) => ({ heading: `H ${k % 50}`, level: 2 + (k % 3), line: k * 3 }));
-		const refs = Array.from({ length: 5000 }, (_, k) => ({ line: k * 3 + 1, target: 'long.md', heading: (k * 7) % 5000 }));
-		const t0 = performance.now();
-		const g = buildGraph([{ id: 'long.md', label: 'long', links: {}, headings, refs }], { headings: 'all', chain: true });
-		const ms = performance.now() - t0;
+	it('one long note: 5,000 headings and 5,000 links build in n log n time', () => {
+		const longNote = (n: number): NodeInput[] => {
+			const headings = Array.from({ length: n }, (_, k) => ({ heading: `H ${k % 50}`, level: 2 + (k % 3), line: k * 3 }));
+			const refs = Array.from({ length: n }, (_, k) => ({ line: k * 3 + 1, target: 'long.md', heading: (k * 7) % n }));
+			return [{ id: 'long.md', label: 'long', links: {}, headings, refs }];
+		};
+		const g = buildGraph(longNote(5000), { headings: 'all', chain: true });
 		expect(g.nodes).toHaveLength(5001);
-		expect(ms).toBeLessThan(process.env.CI ? 400 : 100);
+		const build = growth((n) => {
+			const rows = longNote(n);
+			return () => buildGraph(rows, { headings: 'all', chain: true });
+		}, 50000);
+		expect(build.ratio, build.text).toBeLessThan(GROWTH_LIMIT);
 	});
 
 	it('sectionAt is a binary search: right answers on 100,000 headings', () => {
@@ -340,13 +378,16 @@ function firstDraw(rows: NodeInput[], mode: 'linked' | 'all') {
 
 describe('heading nodes are satellites of their note (review R1 major 1)', () => {
 	for (const mode of ['all', 'linked'] as const) {
-		it(`${mode}: 1,000 notes x 20 headings draw first in 400 ms, and a tick fits one 8 ms frame`, () => {
-			const { g, l, firstMs, perTick } = firstDraw(longRows(1000, 20), mode);
+		it(`${mode}: 1,000 notes x 20 headings draw first, and a tick costs about the same as 1,000 notes without headings`, () => {
+			const rows = longRows(1000, 20);
+			const { g, l } = firstDraw(rows, mode);
 			if (mode === 'all') expect(g.nodes).toHaveLength(21_000);
 			expect(l.bodies.length).toBe(1000);
-			console.log(`perf ${mode} 1000x20: ${g.nodes.length} nodes, first draw ${firstMs.toFixed(0)} ms, ${perTick.toFixed(2)} ms per tick`);
-			expect(firstMs).toBeLessThan(process.env.CI ? 1200 : 400);
-			expect(perTick).toBeLessThan(process.env.CI ? 12 : 8);
+			// Core first: a tick of the same notes without headings, then a tick of the first-draw layout with them.
+			// 20 headings per note that repelled as bodies would give 21 times the bodies in the all mode.
+			const perTick = pairedRatio(hotTick(layoutOf(rows, 'off')), hotTick(l));
+			console.log(`perf ${mode} 1000x20: ${g.nodes.length} nodes, tick ratio ${perTick.ratio.toFixed(2)} (${perTick.text})`);
+			expect(perTick.ratio, perTick.text).toBeLessThan(TICK_LIMIT);
 		});
 	}
 

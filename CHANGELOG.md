@@ -1,5 +1,11 @@
 # bases-link-graph
 
+## 1.5.6
+
+### Patch Changes
+
+- The Pro notice of Bases Link Graph now says that one payment turns on Pro in every NoteMods plugin.
+
 ## 1.5.5
 
 ### Patch Changes

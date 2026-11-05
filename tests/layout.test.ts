@@ -1,12 +1,51 @@
 import { describe, expect, it } from 'vitest';
 import { buildGraph } from '../src/graph';
 import { bounds, createLayout, hitTest, reheat, run, tick } from '../src/layout';
+import { pairedRatio } from './growth';
 
 /** 500 rows, each linking to 3 others: the size the view must handle at interactive speed. */
 function bigGraph(n = 500) {
 	const rows = Array.from({ length: n }, (_, i) => ({ id: `n${i}.md`, label: `n${i}`, links: Object.fromEntries([1, 7, 31].map((d) => [`n${(i * 3 + d) % n}.md`, 1])) }));
 	return buildGraph(rows);
 }
+
+/**
+ * The least work of one exact tick: one pass over all pairs of n points with the same arithmetic as repelExact.
+ * It is the baseline of the tick guard.
+ */
+function pairPass(n: number): () => unknown {
+	const x = Float64Array.from({ length: n }, (_, i) => 30 * Math.sqrt(i) * Math.cos(i));
+	const y = Float64Array.from({ length: n }, (_, i) => 30 * Math.sqrt(i) * Math.sin(i));
+	const vx = new Float64Array(n);
+	const vy = new Float64Array(n);
+	const bodies = Int32Array.from({ length: n }, (_, i) => i);
+	return () => {
+		for (let bi = 0; bi < n; bi++) {
+			const i = bodies[bi]!;
+			for (let bj = bi + 1; bj < n; bj++) {
+				const j = bodies[bj]!;
+				const dx = x[j]! - x[i]!;
+				const dy = y[j]! - y[i]!;
+				let d2 = dx * dx + dy * dy;
+				if (d2 < 25) d2 = 25;
+				const f = 1e-6 / d2;
+				vx[i]! -= dx * f;
+				vy[i]! -= dy * f;
+				vx[j]! += dx * f;
+				vy[j]! += dy * f;
+			}
+		}
+		return vx[0];
+	};
+}
+
+/**
+ * Limit for the tick guard. On the agent Mac (2026-11-03, 10 runs at load 23) 32 ticks of 500 nodes took 14.5 to
+ * 16.8 ms, and one bare pair pass took 0.23 to 0.56 ms (the JIT sometimes makes the pass slower; that only lowers the
+ * ratio). The ratio per tick was 0.91 to 1.99. 4 is about 2 times the highest ratio. Per-pair Math.hypot gave 11.8, a
+ * scan of the edge list for each body gave 6.5, and an allocation per pair gave 66.
+ */
+const PAIR_LIMIT = 4;
 
 const dist = (l: { x: Float64Array; y: Float64Array }, a: number, b: number) => Math.hypot(l.x[a]! - l.x[b]!, l.y[a]! - l.y[b]!);
 
@@ -69,14 +108,29 @@ describe('force layout', () => {
 		const g = bigGraph(500);
 		expect(g.nodes).toHaveLength(500);
 		const l = createLayout(500, g.edges.map((e) => [e.source, e.target] as [number, number]));
-		const t0 = performance.now();
 		const ticks = run(l, 1000);
-		const ms = performance.now() - t0;
-		const perTick = ms / ticks;
-		console.log(`perf: 500 nodes, ${g.edges.length} edges, ${ticks} ticks in ${ms.toFixed(0)} ms (${perTick.toFixed(2)} ms per tick)`);
-		// One frame runs ticks for 8 ms. Strict budget: 2 ms per tick (4 ticks per frame). Busy machines get 4x.
-		// Shared CI runners measured 8.6 ms on 2026-10-12 (commits 0d326a6 and 2faef82), so CI gets 6x.
-		expect(perTick).toBeLessThan(process.env.FX_PERF_STRICT === '1' ? 2 : process.env.CI ? 12 : 8);
+		expect(ticks).toBeGreaterThan(50);
+		expect(Array.from(l.x).every(Number.isFinite)).toBe(true);
+		// Timing guard that holds on a slow shared CI runner (s1103b ASSERT-A). It replaces a limit of 2, 8 or 12 ms per
+		// tick: shared CI runners can be 9 times slower than the agent Mac. A tick of 500 nodes against one bare pass over
+		// the same 125,000 pairs, both timed in this test. Below GRID_FROM a tick is exact repulsion over all pairs plus
+		// linear work, so it costs a small multiple of the bare pass on any machine.
+		// The pass first runs as many times as run() ran the tick above, so both functions are at the same JIT tier. With
+		// only the short warm-up of pairedRatio, the pass took 0.23 to 0.72 ms from run to run.
+		const hot = createLayout(500, g.edges.map((e) => [e.source, e.target] as [number, number]));
+		const pass = pairPass(500);
+		for (let i = 0; i < ticks; i++) pass();
+		// pairedRatio times the pass for at least 20 ms per round. The big side runs 32 ticks (about 20 ms), so a load
+		// burst hits both sides alike; a single 0.7 ms tick escaped the load more often than the pass did.
+		const r = pairedRatio(pass, () => {
+			for (let i = 0; i < 32; i++) {
+				hot.alpha = 0.5;
+				tick(hot);
+			}
+		});
+		const perTick = { ratio: r.ratio / 32, text: `32 ticks against 1 pass: ${r.text}` };
+		console.log(`perf: 500 nodes, ${g.edges.length} edges, ${ticks} ticks, tick ratio ${perTick.ratio.toFixed(2)} (${perTick.text})`);
+		expect(perTick.ratio, perTick.text).toBeLessThan(PAIR_LIMIT);
 	});
 
 	it('run stops at the time budget', () => {

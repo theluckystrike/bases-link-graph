@@ -1,10 +1,9 @@
 {
 	"id": "bases-link-graph",
 	"name": "Bases Link Graph",
-	"version": "1.5.5",
+	"version": "1.5.6",
 	"changes": [
-		"New command \"What Pro adds\": read each Pro feature and try it on a sample graph.",
-		"The Pro section of the settings and the Pro notice also open \"What Pro adds\"."
+		"The Pro notice of Bases Link Graph now says that one payment turns on Pro in every NoteMods plugin."
 	],
 	"tip": "Click a heading node to open its note at that heading.",
 	"thanks": "Hi, I am Michael, a solo developer in Poland. Bases Link Graph is one of over 100 small plugins that I make. Thank you for using it with Bases. Bases is still new, and your setups teach me a lot.",

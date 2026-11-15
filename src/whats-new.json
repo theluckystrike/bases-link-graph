@@ -1,7 +1,7 @@
 {
 	"id": "bases-link-graph",
 	"name": "Bases Link Graph",
-	"version": "1.5.6",
+	"version": "1.5.7",
 	"changes": [
 		"The Pro notice of Bases Link Graph now says that one payment turns on Pro in every NoteMods plugin."
 	],

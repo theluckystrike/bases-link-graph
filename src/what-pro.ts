@@ -78,7 +78,6 @@ function drawSvg(el: HTMLElement, svg: string): void {
 	const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
 	const node = el.doc.importNode(doc.documentElement, true) as unknown as SVGElement;
 	node.addClass('pf-whatpro-graph');
-	node.setCssStyles({ maxWidth: '100%', height: 'auto', maxHeight: '320px', display: 'block' });
 	el.appendChild(node);
 }
 

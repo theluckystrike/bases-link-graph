@@ -154,3 +154,11 @@
 	flex-wrap: wrap;
 	justify-content: flex-start;
 }
+
+/* What Pro adds: sample graph. */
+.pf-whatpro-graph {
+	display: block;
+	max-width: 100%;
+	height: auto;
+	max-height: 320px;
+}
